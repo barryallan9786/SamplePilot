@@ -1,0 +1,6 @@
+{
+  "name": "SamplePilot",
+  "description": "Market research tools: SamplePilot Margin Calculator & Invitation Calculator for project feasibility, required CPI, and audience estimation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
