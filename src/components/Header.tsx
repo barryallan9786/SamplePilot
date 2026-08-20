@@ -6,8 +6,6 @@ interface HeaderProps {
   setActiveTab: (tab: ActiveTab) => void;
   activeCalculator: 'margin' | 'invitation';
   setActiveCalculator: (calc: 'margin' | 'invitation') => void;
-  onOpenNewProject: () => void;
-  onOpenSaveModal: () => void;
   onOpenAbout: () => void;
   notifications: NotificationItem[];
   onMarkNotificationRead: (id: string) => void;
@@ -18,8 +16,6 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   activeCalculator,
   setActiveCalculator,
-  onOpenNewProject,
-  onOpenSaveModal,
   onOpenAbout,
   notifications,
   onMarkNotificationRead,
@@ -90,18 +86,6 @@ export const Header: React.FC<HeaderProps> = ({
               Invitation Calculator
             </button>
 
-            {/* History */}
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`flex items-center gap-1.5 h-full font-bold text-sm tracking-wider uppercase transition-colors border-b-2 ${
-                activeTab === 'history'
-                  ? 'border-white text-white'
-                  : 'border-transparent text-white/80 hover:text-white'
-              }`}
-            >
-              History
-            </button>
-
             {/* Resources */}
             <button
               onClick={() => setActiveTab('resources')}
@@ -118,27 +102,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* New Project CTA */}
-          <button
-            onClick={onOpenNewProject}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-[#E8442C] hover:bg-white/90 text-xs sm:text-sm font-bold rounded-lg transition-all shadow-xs active:scale-95"
-          >
-            <span className="material-symbols-outlined text-base">add</span>
-            <span className="hidden xs:inline">New Project</span>
-          </button>
-
-          {/* Quick Save CTA */}
-          {(activeTab === 'margin' || activeTab === 'invitation') && (
-            <button
-              onClick={onOpenSaveModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs sm:text-sm font-semibold rounded-lg transition-all"
-              title="Save Scenario"
-            >
-              <span className="material-symbols-outlined text-base">bookmark</span>
-              <span className="hidden sm:inline">Save</span>
-            </button>
-          )}
-
           {/* Notifications Bell */}
           <div className="relative" ref={notifRef}>
             <button
@@ -189,14 +152,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* About This Project Button */}
+          {/* About SamplePilot Button */}
           <button
             onClick={onOpenAbout}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs sm:text-sm font-bold rounded-lg transition-all shadow-xs active:scale-95"
-            title="About This Project"
+            title="About SamplePilot"
           >
             <span className="material-symbols-outlined text-base">info</span>
-            <span className="hidden sm:inline">About This Project</span>
+            <span className="hidden sm:inline">About SamplePilot</span>
             <span className="sm:hidden">About</span>
           </button>
 
@@ -247,19 +210,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => {
-              setActiveTab('history');
-              setShowMobileMenu(false);
-            }}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${
-              activeTab === 'history' ? 'bg-white/20 text-white' : 'text-white/80'
-            }`}
-          >
-            <span className="material-symbols-outlined text-lg">history</span>
-            History
-          </button>
-
-          <button
-            onClick={() => {
               setActiveTab('resources');
               setShowMobileMenu(false);
             }}
@@ -279,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 bg-white/20 text-white"
           >
             <span className="material-symbols-outlined text-lg">info</span>
-            About This Project
+            About SamplePilot
           </button>
         </div>
       )}

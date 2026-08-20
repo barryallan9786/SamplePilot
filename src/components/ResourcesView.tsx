@@ -1,10 +1,6 @@
 import React from 'react';
 
-interface ResourcesViewProps {
-  onOpenContactSupport: () => void;
-}
-
-export const ResourcesView: React.FC<ResourcesViewProps> = ({ onOpenContactSupport }) => {
+export const ResourcesView: React.FC = () => {
   return (
     <div className="w-full max-w-[1120px] mx-auto px-4 md:px-8 py-8 flex flex-col gap-10">
       <div className="border-b border-[#E5E5E5] pb-6">
@@ -100,40 +96,24 @@ export const ResourcesView: React.FC<ResourcesViewProps> = ({ onOpenContactSuppo
           </section>
         </div>
 
-        {/* Right Column: Legal & Support */}
+        {/* Right Column: Legal & Privacy */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="calc-card p-6 space-y-4">
-            <h3 className="font-bold text-base text-[#2B2B2B] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#E8442C]">help</span>
-              Support & Inquiries
-            </h3>
-            <p className="text-xs text-gray-600 font-medium leading-relaxed">
-              Have questions regarding complex sampling projects, custom API integrations, or high-volume enterprise panel contracts?
-            </p>
-            <button
-              onClick={onOpenContactSupport}
-              className="w-full bg-[#E8442C] text-white font-bold text-xs py-3 px-4 rounded-xl hover:bg-[#C93A24] transition-colors shadow-sm"
-            >
-              Contact Support Team
-            </button>
-          </div>
-
           <div className="calc-card p-6 space-y-4">
             <h3 className="font-bold text-base text-[#2B2B2B] flex items-center gap-2">
               <span className="material-symbols-outlined text-[#E8442C]">gavel</span>
               Legal & Privacy Policies
             </h3>
-            <div className="text-xs text-gray-600 space-y-3 font-medium">
+            <div className="text-xs text-gray-600 space-y-4 font-medium leading-relaxed">
               <div>
-                <div className="font-bold text-[#2B2B2B] mb-0.5">Terms of Service</div>
-                <p className="line-clamp-3">
-                  All calculations provided are estimation models for operational guidance. Actual respondent yield may vary based on panel demographics and seasonality.
+                <div className="font-bold text-[#2B2B2B] mb-1">Terms of Service</div>
+                <p>
+                  Built for smart decision-making. SamplePilot gives you data-driven estimates tailored to real project variables like panel mix, screener design, and timing, so you always have a strong operational baseline to work from.
                 </p>
               </div>
-              <div>
-                <div className="font-bold text-[#2B2B2B] mb-0.5">Privacy Policy</div>
-                <p className="line-clamp-3">
-                  Client project metrics, CPI quotes, and sample sizes entered in Invitation Calculator are stored client-side in session storage and remain private to your browser.
+              <div className="border-t border-gray-100 pt-3">
+                <div className="font-bold text-[#2B2B2B] mb-1">Privacy Policy</div>
+                <p>
+                  Your data never leaves your browser. Every project metric, CPI quote, and sample size you enter is calculated locally and lives only in your session. Close the tab, and it's gone. No servers, no storage, no tracking.
                 </p>
               </div>
             </div>

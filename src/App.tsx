@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, MarginData, InvitationData, SavedItem, NotificationItem } from './types';
-import { initialMarginData, initialInvitationData, initialSavedItems, initialNotifications } from './data/initialData';
+import { ActiveTab, MarginData, InvitationData, NotificationItem } from './types';
+import { initialMarginData, initialInvitationData, initialNotifications } from './data/initialData';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { MarginCalculator } from './components/MarginCalculator';
 import { InvitationCalculator } from './components/InvitationCalculator';
-import { HistoryView } from './components/HistoryView';
 import { ResourcesView } from './components/ResourcesView';
-import { NewProjectModal } from './components/NewProjectModal';
-import { SaveModal } from './components/SaveModal';
-import { ContactSupportModal } from './components/ContactSupportModal';
 import { AboutModal } from './components/AboutModal';
-import { calculateMarginResults, calculateInvitationResults, formatCurrency, formatNumber, validateAndSanitizeMarginData, validateAndSanitizeInvitationData } from './utils/calculations';
+import { calculateMarginResults, calculateInvitationResults, validateAndSanitizeMarginData, validateAndSanitizeInvitationData } from './utils/calculations';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('margin');
@@ -49,56 +45,20 @@ export default function App() {
     return validateAndSanitizeInvitationData(initialInvitationData);
   });
 
-  const [savedItems, setSavedItems] = useState<SavedItem[]>(() => {
-    const local = localStorage.getItem('inv_calc_saved_items');
-    if (local) {
-      try {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed)) {
-          let hasMigration = false;
-          const sanitized = parsed.map((item: SavedItem) => {
-            if (item.type === 'margin' && item.marginData) {
-              const sanitizedData = validateAndSanitizeMarginData(item.marginData);
-              if (JSON.stringify(sanitizedData) !== JSON.stringify(item.marginData)) {
-                hasMigration = true;
-                return {
-                  ...item,
-                  marginData: sanitizedData,
-                };
-              }
-            }
-            return item;
-          });
-          if (hasMigration) {
-            console.warn('[LocalStorage Migration] Auto-repaired saved items in localStorage.');
-            localStorage.setItem('inv_calc_saved_items', JSON.stringify(sanitized));
-          }
-          return sanitized;
-        }
-      } catch (e) {
-        console.error('Error parsing inv_calc_saved_items from localStorage:', e);
-      }
-    }
-    return initialSavedItems.map((item) => {
-      if (item.type === 'margin' && item.marginData) {
-        return {
-          ...item,
-          marginData: validateAndSanitizeMarginData(item.marginData),
-        };
-      }
-      return item;
-    });
-  });
-
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
 
   // Modal controls
-  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isContactSupportOpen, setIsContactSupportOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
 
-  // Sync to local storage
+  // Sync to local storage & clean up any legacy history data store
+  useEffect(() => {
+    try {
+      localStorage.removeItem('inv_calc_saved_items');
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('inv_calc_margin_data', JSON.stringify(marginData));
   }, [marginData]);
@@ -106,10 +66,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('inv_calc_invitation_data', JSON.stringify(invitationData));
   }, [invitationData]);
-
-  useEffect(() => {
-    localStorage.setItem('inv_calc_saved_items', JSON.stringify(savedItems));
-  }, [savedItems]);
 
   // Tab switcher wrapper
   const handleTabChange = (tab: ActiveTab) => {
@@ -124,105 +80,11 @@ export default function App() {
     setActiveTab(calc);
   };
 
-  // Load item from history
-  const handleLoadMargin = (data: MarginData) => {
-    setMarginData(data);
-    setActiveCalculator('margin');
-    setActiveTab('margin');
-  };
-
-  const handleLoadInvitation = (data: InvitationData) => {
-    setInvitationData(validateAndSanitizeInvitationData(data));
-    setActiveCalculator('invitation');
-    setActiveTab('invitation');
-  };
-
-  // Delete saved item
-  const handleDeleteSavedItem = (id: string) => {
-    setSavedItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
   // Mark notification read
   const handleMarkNotificationRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
-  };
-
-  // Create new project preset
-  const handleCreateProject = (type: 'margin' | 'invitation', title: string) => {
-    if (type === 'margin') {
-      const resetMargin: MarginData = {
-        totalCompletes: 1000,
-        clientCpi: 5.00,
-        targetMargin: 30,
-        incidenceRate: 20,
-        phases: [{ id: '1', phase: 'Launch Phase', completes: 0, cpi: 1.50 }],
-      };
-      setMarginData(resetMargin);
-      setActiveCalculator('margin');
-      setActiveTab('margin');
-    } else {
-      const resetInvitation: InvitationData = {
-        targetCompletes: 1000,
-        bidIr: 20,
-        infieldIr: 20,
-        panelResponseRate: 10,
-        completesAchieved: 0,
-      };
-      setInvitationData(resetInvitation);
-      setActiveCalculator('invitation');
-      setActiveTab('invitation');
-    }
-
-    // Add notification
-    const newNotif: NotificationItem = {
-      id: Date.now().toString(),
-      title: 'New Project Initialized',
-      message: `Started new ${type} calculator project: ${title}`,
-      time: 'Just now',
-      type: 'info',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
-
-  // Confirm Save Scenario / Report
-  const handleConfirmSave = (title: string, notes: string) => {
-    const isMargin = activeCalculator === 'margin';
-    let keyMetric = '';
-
-    if (isMargin) {
-      const res = calculateMarginResults(marginData);
-      keyMetric = `Req Future CPI: ${formatCurrency(res.requiredFutureCpi)}`;
-    } else {
-      const res = calculateInvitationResults(invitationData);
-      keyMetric = `Invites Needed: ${formatNumber(res.liveInvites)}`;
-    }
-
-    const newItem: SavedItem = {
-      id: `scen-${Date.now()}`,
-      type: isMargin ? 'margin' : 'invitation',
-      title,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      marginData: isMargin ? marginData : undefined,
-      invitationData: !isMargin ? invitationData : undefined,
-      keyMetric,
-      notes,
-    };
-
-    setSavedItems((prev) => [newItem, ...prev]);
-
-    // Add toast notification
-    const newNotif: NotificationItem = {
-      id: Date.now().toString(),
-      title: 'Saved to History',
-      message: `Saved "${title}" (${isMargin ? 'Margin Scenario' : 'Invitation Report'})`,
-      time: 'Just now',
-      type: 'success',
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
   };
 
   // Export CSV Handler
@@ -298,8 +160,6 @@ export default function App() {
         setActiveTab={handleTabChange}
         activeCalculator={activeCalculator}
         setActiveCalculator={handleCalculatorChange}
-        onOpenNewProject={() => setIsNewProjectOpen(true)}
-        onOpenSaveModal={() => setIsSaveModalOpen(true)}
         onOpenAbout={() => setIsAboutOpen(true)}
         notifications={notifications}
         onMarkNotificationRead={handleMarkNotificationRead}
@@ -311,7 +171,6 @@ export default function App() {
           <MarginCalculator
             data={marginData}
             onChange={setMarginData}
-            onSaveScenario={() => setIsSaveModalOpen(true)}
             onExport={handleExportCSV}
           />
         )}
@@ -320,58 +179,22 @@ export default function App() {
           <InvitationCalculator
             data={invitationData}
             onChange={setInvitationData}
-            onSaveReport={() => setIsSaveModalOpen(true)}
             onExport={handleExportCSV}
           />
         )}
 
-        {activeTab === 'history' && (
-          <HistoryView
-            items={savedItems}
-            onLoadMargin={handleLoadMargin}
-            onLoadInvitation={handleLoadInvitation}
-            onDeleteItem={handleDeleteSavedItem}
-          />
-        )}
-
         {activeTab === 'resources' && (
-          <ResourcesView
-            onOpenContactSupport={() => setIsContactSupportOpen(true)}
-          />
+          <ResourcesView />
         )}
       </main>
 
       {/* Footer */}
       <Footer
         setActiveTab={handleTabChange}
-        onOpenContactSupport={() => setIsContactSupportOpen(true)}
         onOpenAbout={() => setIsAboutOpen(true)}
       />
 
       {/* Modals */}
-      <NewProjectModal
-        isOpen={isNewProjectOpen}
-        onClose={() => setIsNewProjectOpen(false)}
-        onCreateProject={handleCreateProject}
-      />
-
-      <SaveModal
-        isOpen={isSaveModalOpen}
-        onClose={() => setIsSaveModalOpen(false)}
-        calculatorType={activeCalculator}
-        defaultTitle={
-          activeCalculator === 'margin'
-            ? `Margin Check - ${marginData.totalCompletes} Completes`
-            : `Invitation Batch - ${invitationData.targetCompletes} Completes`
-        }
-        onConfirmSave={handleConfirmSave}
-      />
-
-      <ContactSupportModal
-        isOpen={isContactSupportOpen}
-        onClose={() => setIsContactSupportOpen(false)}
-      />
-
       <AboutModal
         isOpen={isAboutOpen}
         onClose={() => setIsAboutOpen(false)}

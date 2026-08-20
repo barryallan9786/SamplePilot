@@ -6,14 +6,12 @@ import { NumericInput } from './NumericInput';
 interface MarginCalculatorProps {
   data: MarginData;
   onChange: (updated: MarginData) => void;
-  onSaveScenario: () => void;
   onExport: () => void;
 }
 
 export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
   data,
   onChange,
-  onSaveScenario,
   onExport,
 }) => {
   const results = calculateMarginResults(data);
@@ -333,17 +331,10 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
           <div className="flex gap-4 justify-end mt-2">
             <button
               onClick={onExport}
-              className="bg-white text-[#2B2B2B] border border-[#E5E5E5] rounded-xl font-bold py-3 px-6 hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm"
+              className="bg-[#E8442C] text-white rounded-xl font-bold py-3 px-6 hover:bg-[#C93A24] transition-colors flex items-center gap-2 shadow-sm"
             >
               <span className="material-symbols-outlined text-lg">download</span>
-              Export
-            </button>
-            <button
-              onClick={onSaveScenario}
-              className="bg-gradient-to-r from-[#E8442C] to-[#C93A24] text-white font-bold rounded-xl py-3 px-6 hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md"
-            >
-              <span className="material-symbols-outlined text-lg">save</span>
-              Save Scenario
+              Export CSV
             </button>
           </div>
         </div>

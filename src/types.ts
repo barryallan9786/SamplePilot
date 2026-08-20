@@ -1,4 +1,4 @@
-export type ActiveTab = 'margin' | 'invitation' | 'history' | 'resources';
+export type ActiveTab = 'margin' | 'invitation' | 'resources';
 
 export interface CpiPhase {
   id: string;
@@ -69,17 +69,6 @@ export interface InvitationResults {
   validationErrors: Record<string, string>;
 }
 
-export interface SavedItem {
-  id: string;
-  type: 'margin' | 'invitation';
-  title: string;
-  timestamp: string;
-  marginData?: MarginData;
-  invitationData?: InvitationData;
-  keyMetric: string;
-  notes?: string;
-}
-
 export interface NotificationItem {
   id: string;
   title: string;
@@ -88,3 +77,4 @@ export interface NotificationItem {
   type: 'alert' | 'info' | 'success';
   read: boolean;
 }
+

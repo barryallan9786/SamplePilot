@@ -21,7 +21,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         <div className="bg-gradient-to-r from-[#E8442C] via-[#DC3820] to-[#C93A24] text-white p-6 md:p-8 rounded-t-3xl relative flex items-start justify-between gap-4">
           <div className="space-y-2 max-w-lg">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-wider">
-              <span className="material-symbols-outlined text-sm">auto_awesome</span>
               Founder's Note & Team Recognition
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
@@ -40,28 +39,13 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
 
         {/* Modal Body */}
         <div className="p-6 md:p-8 space-y-8 text-slate-700 text-sm md:text-base leading-relaxed">
-          {/* Hero Section */}
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[#E8442C] flex items-center justify-center shrink-0 shadow-sm">
-              <span className="material-symbols-outlined text-2xl">analytics</span>
-            </div>
-            <div>
-              <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight">
-                Built by practitioners. Designed for fieldwork teams.
-              </h3>
-              <p className="text-slate-600 text-sm mt-1 leading-normal">
-                An operational toolkit created to replace tedious manual spreadsheets with fast, accurate sampling and profitability decisions.
-              </p>
-            </div>
-          </div>
-
           {/* Narrative Paragraphs */}
           <div className="space-y-4 text-slate-600 text-sm md:text-base leading-relaxed">
             <p>
-              This project started as an idea and gradually became a working application through experimentation, learning, and collaboration.
+              This project started as an idea and grew into a working application through experimentation, learning, and collaboration.
             </p>
             <p>
-              Building something is rarely a one-person journey. I’m grateful to have had the support of people who were willing to contribute, challenge ideas, share feedback, and help turn a concept into something real.
+              Building is rarely a solo effort. I'm grateful to everyone who contributed, challenged ideas, offered feedback, and helped turn it into something real.
             </p>
           </div>
 
@@ -87,66 +71,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Inspirational Quote Card */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 md:p-8 text-center shadow-md relative overflow-hidden border border-slate-800">
-            <div className="absolute inset-0 bg-radial from-orange-500/10 to-transparent pointer-events-none"></div>
-            <span className="material-symbols-outlined text-3xl text-orange-400 opacity-80 mb-2">format_quote</span>
-            <p className="text-base md:text-lg font-semibold italic text-slate-100 max-w-lg mx-auto leading-relaxed">
-              "Built with curiosity, collaboration, and a willingness to keep learning."
-            </p>
-          </div>
-
-          {/* Built For Research Operations Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#E8442C] text-xl">precision_manufacturing</span>
-              <h3 className="text-base font-extrabold text-slate-900 uppercase tracking-wider text-xs">
-                Built For Research Operations
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4 space-y-1 hover:border-slate-300 transition-colors">
-                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                  <span className="material-symbols-outlined text-[#E8442C] text-lg">mail</span>
-                  Invitation Calculator
-                </div>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Calculate required invite volume, start sample size, and expected completes.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4 space-y-1 hover:border-slate-300 transition-colors">
-                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                  <span className="material-symbols-outlined text-[#E8442C] text-lg">calculate</span>
-                  Margin Calculator
-                </div>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Determine blend cost per complete, required future CPI, and gross margin cushion.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4 space-y-1 hover:border-slate-300 transition-colors">
-                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                  <span className="material-symbols-outlined text-[#E8442C] text-lg">verified</span>
-                  Feasibility Analysis
-                </div>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Identify financial risk, incidence rate drop thresholds, and required cost adjustments.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4 space-y-1 hover:border-slate-300 transition-colors">
-                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                  <span className="material-symbols-outlined text-[#E8442C] text-lg">history</span>
-                  Project Decision Support
-                </div>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Save snapshot scenarios, track calculation logs, and export executive summary reports.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* Feedback & Contact Section */}
           <div className="border-t border-slate-100 pt-6 space-y-4">
