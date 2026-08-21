@@ -91,10 +91,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-base">✏️</span>
                 We'd love your feedback
               </h4>
-              <p className="text-xs text-[#2D323C] leading-relaxed">
-                Have an idea, suggestion, or even a small thought about how we can make this better?
-              </p>
-              <p className="text-xs font-bold text-[#D83B25] pt-1 leading-relaxed">
+              <p className="text-xs font-bold text-[#D83B25] pt-0.5 leading-relaxed">
                 Go for it, we're eager to read everything!
               </p>
             </div>
@@ -104,20 +101,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               className="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D83B25] hover:bg-[#C2311D] text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs hover:shadow active:scale-95 group"
             >
               <span className="material-symbols-outlined text-base group-hover:scale-110 transition-transform">mail</span>
-              <span>Contact the Creator</span>
-            </a>
-          </div>
-
-          {/* Direct Email Footer Link */}
-          <div className="pt-0.5 pb-0.5 text-center flex flex-col items-center justify-center gap-1">
-            <span className="text-xs text-slate-500 font-medium">
-              Reach the creator directly
-            </span>
-            <a
-              href="mailto:Shadabhussain9786@gmail.com"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#D83B25] hover:text-[#B82E1A] transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm sm:text-base">mail</span>
               <span>Shadabhussain9786@gmail.com</span>
             </a>
           </div>
