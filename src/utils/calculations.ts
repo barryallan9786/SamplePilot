@@ -278,6 +278,9 @@ export function validateAndSanitizeInvitationData(data: any): InvitationData {
     infieldIr: 18,
     panelResponseRate: 8,
     completesAchieved: 0,
+    trackProgressBy: 'entrants',
+    totalEntrantsSoFar: null,
+    completesSoFar: null,
   };
 
   if (!data || typeof data !== 'object') {
@@ -309,12 +312,33 @@ export function validateAndSanitizeInvitationData(data: any): InvitationData {
     completesAchieved = 0;
   }
 
+  const trackProgressBy = data.trackProgressBy === 'completes' ? 'completes' : 'entrants';
+
+  let totalEntrantsSoFar: number | string | null = null;
+  if (data.totalEntrantsSoFar !== undefined && data.totalEntrantsSoFar !== null && data.totalEntrantsSoFar !== '') {
+    const parsed = Number(data.totalEntrantsSoFar);
+    if (!isNaN(parsed) && isFinite(parsed) && parsed >= 0) {
+      totalEntrantsSoFar = parsed;
+    }
+  }
+
+  let completesSoFar: number | string | null = null;
+  if (data.completesSoFar !== undefined && data.completesSoFar !== null && data.completesSoFar !== '') {
+    const parsed = Number(data.completesSoFar);
+    if (!isNaN(parsed) && isFinite(parsed) && parsed >= 0) {
+      completesSoFar = parsed;
+    }
+  }
+
   return {
     targetCompletes,
     bidIr,
     infieldIr,
     panelResponseRate,
     completesAchieved,
+    trackProgressBy,
+    totalEntrantsSoFar,
+    completesSoFar,
   };
 }
 
@@ -344,7 +368,7 @@ export function calculateInvitationResults(data: InvitationData): InvitationResu
   const liveParticipants = Math.ceil(targetCompletes / validInfieldIr);
   const liveInvites = Math.ceil(liveParticipants / validResponseRate);
 
-  // Section 3: Completes Progress So Far
+  // Section 3: Completes Progress So Far (legacy reference)
   const remainingCompletesNeeded = Math.max(0, targetCompletes - completesAchieved);
   const progressPercentage = targetCompletes > 0 ? Math.min(100, Math.max(0, (completesAchieved / targetCompletes) * 100)) : 0;
 
@@ -353,6 +377,30 @@ export function calculateInvitationResults(data: InvitationData): InvitationResu
   let estimatedInvitesSent: number | null = null;
   if (plannedYieldRateDecimal > 0) {
     estimatedInvitesSent = Math.ceil(completesAchieved / plannedYieldRateDecimal);
+  }
+
+  // Stage 3: Progress Tracker Calculation
+  const trackProgressBy = safeData.trackProgressBy === 'completes' ? 'completes' : 'entrants';
+  let progressInvitationsSent: number | null = null;
+  const progressFormulaNote =
+    trackProgressBy === 'completes'
+      ? 'Completes ÷ Infield IR ÷ Panel Response Rate'
+      : 'Total Entrants ÷ Panel Response Rate';
+
+  if (trackProgressBy === 'entrants') {
+    if (safeData.totalEntrantsSoFar !== null && safeData.totalEntrantsSoFar !== undefined) {
+      const entrants = Number(safeData.totalEntrantsSoFar);
+      if (!isNaN(entrants) && validResponseRate > 0) {
+        progressInvitationsSent = Math.ceil(entrants / validResponseRate);
+      }
+    }
+  } else {
+    if (safeData.completesSoFar !== null && safeData.completesSoFar !== undefined) {
+      const completes = Number(safeData.completesSoFar);
+      if (!isNaN(completes) && validInfieldIr > 0 && validResponseRate > 0) {
+        progressInvitationsSent = Math.ceil((completes / validInfieldIr) / validResponseRate);
+      }
+    }
   }
 
   // Sanity check assertion
@@ -368,6 +416,8 @@ export function calculateInvitationResults(data: InvitationData): InvitationResu
     remainingCompletesNeeded,
     estimatedInvitesSent,
     progressPercentage,
+    progressInvitationsSent,
+    progressFormulaNote,
     assertionPassed,
     validationErrors,
   };

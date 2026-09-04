@@ -17,6 +17,9 @@ export const initialInvitationData: InvitationData = {
   infieldIr: 18,
   panelResponseRate: 8,
   completesAchieved: 0,
+  trackProgressBy: 'entrants',
+  totalEntrantsSoFar: null,
+  completesSoFar: null,
 };
 
 export const initialNotifications: NotificationItem[] = [

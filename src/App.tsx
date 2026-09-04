@@ -139,7 +139,16 @@ export default function App() {
 
       csvContent += `STAGE 2 - LIVE PERFORMANCE ESTIMATE\n`;
       csvContent += `Survey Participants Expected,${res.liveParticipants}\n`;
-      csvContent += `INVITES TO RELEASE,${res.liveInvites}\n`;
+      csvContent += `INVITES TO RELEASE,${res.liveInvites}\n\n`;
+
+      csvContent += `STAGE 3 - PROGRESS TRACKER\n`;
+      csvContent += `Track Progress By,${invitationData.trackProgressBy === 'completes' ? 'Completes So Far' : 'Total Entrants So Far'}\n`;
+      if (invitationData.trackProgressBy === 'completes') {
+        csvContent += `Completes So Far,${invitationData.completesSoFar ?? '—'}\n`;
+      } else {
+        csvContent += `Total Entrants Into Survey So Far,${invitationData.totalEntrantsSoFar ?? '—'}\n`;
+      }
+      csvContent += `Invitations sent so far (estimate),${res.progressInvitationsSent !== null && res.progressInvitationsSent !== undefined ? res.progressInvitationsSent : '—'}\n`;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

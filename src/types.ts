@@ -49,12 +49,17 @@ export interface MarginResults {
   validationErrors: Record<string, string>;
 }
 
+export type ProgressTrackBy = 'entrants' | 'completes';
+
 export interface InvitationData {
   targetCompletes: number;
   bidIr: number;
   infieldIr: number;
   panelResponseRate: number;
   completesAchieved: number;
+  trackProgressBy?: ProgressTrackBy;
+  totalEntrantsSoFar?: number | string | null;
+  completesSoFar?: number | string | null;
 }
 
 export interface InvitationResults {
@@ -65,6 +70,8 @@ export interface InvitationResults {
   remainingCompletesNeeded: number;
   estimatedInvitesSent: number | null;
   progressPercentage: number;
+  progressInvitationsSent: number | null;
+  progressFormulaNote: string;
   assertionPassed: boolean;
   validationErrors: Record<string, string>;
 }

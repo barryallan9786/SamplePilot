@@ -23,6 +23,94 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
     });
   };
 
+  const trackBy = data.trackProgressBy || 'entrants';
+
+  // Input states allowing smooth numeric typing & clean empty detection
+  const [entrantsInput, setEntrantsInput] = React.useState<string>(() =>
+    data.totalEntrantsSoFar !== undefined && data.totalEntrantsSoFar !== null
+      ? String(data.totalEntrantsSoFar)
+      : ''
+  );
+  const [completesInput, setCompletesInput] = React.useState<string>(() =>
+    data.completesSoFar !== undefined && data.completesSoFar !== null
+      ? String(data.completesSoFar)
+      : ''
+  );
+
+  // Synchronize when data prop changes from outside
+  React.useEffect(() => {
+    const nextVal =
+      data.totalEntrantsSoFar !== undefined && data.totalEntrantsSoFar !== null
+        ? String(data.totalEntrantsSoFar)
+        : '';
+    setEntrantsInput((prev) => (prev !== nextVal ? nextVal : prev));
+  }, [data.totalEntrantsSoFar]);
+
+  React.useEffect(() => {
+    const nextVal =
+      data.completesSoFar !== undefined && data.completesSoFar !== null
+        ? String(data.completesSoFar)
+        : '';
+    setCompletesInput((prev) => (prev !== nextVal ? nextVal : prev));
+  }, [data.completesSoFar]);
+
+  const handleTrackByChange = (val: 'entrants' | 'completes') => {
+    onChange({
+      ...data,
+      trackProgressBy: val,
+    });
+  };
+
+  const handleEntrantsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = raw.replace(/[^\d]/g, '');
+    setEntrantsInput(sanitized);
+    onChange({
+      ...data,
+      totalEntrantsSoFar: sanitized === '' ? null : parseInt(sanitized, 10),
+    });
+  };
+
+  const handleCompletesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = raw.replace(/[^\d]/g, '');
+    setCompletesInput(sanitized);
+    onChange({
+      ...data,
+      completesSoFar: sanitized === '' ? null : parseInt(sanitized, 10),
+    });
+  };
+
+  // Check if current active required input field is empty
+  const isEntrants = trackBy === 'entrants';
+  const activeInputString = isEntrants ? entrantsInput.trim() : completesInput.trim();
+  const isInputEmpty = activeInputString === '';
+
+  // Calculate Invitations Sent So Far
+  // If tracking by Entrants: Total Entrants ÷ (Panel Response Rate ÷ 100)
+  // If tracking by Completes: (Completes ÷ (Infield IR ÷ 100)) ÷ (Panel Response Rate ÷ 100)
+  const panelResponseRateDecimal = data.panelResponseRate > 0 ? data.panelResponseRate / 100 : 0;
+  const infieldIrDecimal = data.infieldIr > 0 ? data.infieldIr / 100 : 0;
+
+  let invitationsSentResult: number | null = null;
+  if (!isInputEmpty) {
+    if (isEntrants) {
+      const entrantsNum = parseInt(activeInputString, 10);
+      if (!isNaN(entrantsNum) && panelResponseRateDecimal > 0) {
+        invitationsSentResult = Math.ceil(entrantsNum / panelResponseRateDecimal);
+      }
+    } else {
+      const completesNum = parseInt(activeInputString, 10);
+      if (!isNaN(completesNum) && infieldIrDecimal > 0 && panelResponseRateDecimal > 0) {
+        invitationsSentResult = Math.ceil((completesNum / infieldIrDecimal) / panelResponseRateDecimal);
+      }
+    }
+  }
+
+  const formulaNoteText = isEntrants
+    ? 'Total Entrants ÷ Panel Response Rate'
+    : 'Completes ÷ Infield IR ÷ Panel Response Rate';
+
   return (
     <div className="w-full">
       {/* Header Banner with Diagonal Red Gradient */}
@@ -195,96 +283,127 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
           </div>
         </section>
 
-        {/* Stage 3 — Completes Progress So Far Card */}
-        <section className="calc-card shadow-md">
+        {/* Stage 3 — Progress Tracker Card */}
+        <section
+          className={`calc-card shadow-md transition-all duration-200 ${
+            isInputEmpty ? 'opacity-75' : ''
+          }`}
+        >
           <div className="flex items-center gap-4 mb-6 border-b border-[#E5E5E5] pb-4">
-            <div className="w-8 h-8 rounded-full bg-[#1E293B] text-white flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm">
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-sm shrink-0 border transition-colors ${
+                isInputEmpty
+                  ? 'bg-gray-100 text-gray-400 border-gray-200'
+                  : 'bg-gray-100 text-[#2B2B2B] border-gray-200'
+              }`}
+            >
               3
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#2B2B2B]">Completes Progress So Far</h2>
-              <p className="text-xs text-gray-500 font-medium">Track completes achieved against your target.</p>
-            </div>
-          </div>
-
-          {/* Validation Warnings */}
-          {Object.keys(results.validationErrors).length > 0 && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex flex-col gap-1 text-sm font-medium">
-              {Object.values(results.validationErrors).map((err, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base">warning</span>
-                  <span>{err}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Completes Achieved So Far - Single Editable Input */}
-          <div className="mb-8 max-w-md">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="completes_achieved">
-                Completes Achieved So Far *
-              </label>
-              <NumericInput
-                id="completes_achieved"
-                className={`calc-input !px-4 font-medium text-base ${
-                  results.validationErrors.completesAchievedExceedsTarget
-                    ? 'border-red-500 bg-red-50/30'
-                    : ''
+              <h2
+                className={`text-xl font-bold transition-colors ${
+                  isInputEmpty ? 'text-[#2B2B2B]/80' : 'text-[#2B2B2B]'
                 }`}
-                placeholder="0"
-                value={data.completesAchieved}
-                onFocus={(e) => e.target.select()}
-                onChange={(val) => handleFieldChange('completesAchieved', val)}
-                isDecimal={false}
-              />
+              >
+                Progress Tracker
+              </h2>
+              <p className="text-xs text-gray-500 font-medium">
+                Track estimated invitations sent based on fielding progress to date
+              </p>
             </div>
           </div>
 
-          {/* Derived Metrics Grid & Progress Bar */}
-          <div className="border-t border-[#E5E5E5] pt-6 flex flex-col gap-6">
-            {/* Row 1: Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Estimated Invitations Sent So Far */}
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200/80 flex flex-col gap-1">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estimated Invitations Sent So Far</span>
-                <span className="text-3xl font-extrabold text-[#2B2B2B]">
-                  {results.estimatedInvitesSent !== null ? formatNumber(results.estimatedInvitesSent) : '—'}
-                </span>
-                <span className="text-[11px] text-gray-500 font-medium pt-1">
-                  Based on planned yield rate
-                </span>
-              </div>
-
-              {/* Progress Percentage */}
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200/80 flex flex-col gap-1">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Progress %</span>
-                <span className="text-3xl font-extrabold text-[#2B2B2B]">
-                  {results.progressPercentage.toFixed(1)}%
-                </span>
-                <span className="text-[11px] text-gray-500 font-medium pt-1">
-                  Achieved ({formatNumber(data.completesAchieved)}) ÷ Target ({formatNumber(data.targetCompletes)})
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            {/* Track progress by dropdown */}
+            <div className="flex flex-col gap-2">
+              <label
+                className="text-xs font-bold uppercase tracking-wider text-gray-600"
+                htmlFor="track_progress_by"
+              >
+                Track progress by
+              </label>
+              <div className="relative flex items-center">
+                <select
+                  id="track_progress_by"
+                  value={trackBy}
+                  onChange={(e) => handleTrackByChange(e.target.value as 'entrants' | 'completes')}
+                  className="calc-input appearance-none !px-4 !pr-10 font-medium text-base bg-white cursor-pointer focus:outline-none focus:border-[#E8442C] focus:ring-1 focus:ring-[#E8442C]"
+                >
+                  <option value="entrants">Total Entrants So Far</option>
+                  <option value="completes">Completes So Far</option>
+                </select>
+                <span className="absolute right-3.5 text-gray-500 pointer-events-none select-none material-symbols-outlined text-xl">
+                  expand_more
                 </span>
               </div>
             </div>
 
-            {/* Progress Bar Container */}
-            <div className="flex flex-col gap-2.5 bg-gray-50 rounded-xl p-5 border border-gray-200/80">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-600">Completion Progress</span>
-                <span className="text-xs font-extrabold text-[#2B2B2B]">{results.progressPercentage.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-[#E8442C] h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${results.progressPercentage}%` }}
+            {/* Dynamic single input based on selection */}
+            {isEntrants ? (
+              <div className="flex flex-col gap-2">
+                <label
+                  className="text-xs font-bold uppercase tracking-wider text-gray-600"
+                  htmlFor="total_entrants_so_far"
+                >
+                  Total Entrants Into Survey So Far *
+                </label>
+                <input
+                  id="total_entrants_so_far"
+                  type="text"
+                  inputMode="numeric"
+                  className="calc-input !px-4 font-medium text-base focus:outline-none focus:border-[#E8442C] focus:ring-1 focus:ring-[#E8442C]"
+                  placeholder="0"
+                  value={entrantsInput}
+                  onChange={handleEntrantsChange}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
-              <div className="flex justify-between items-center text-[11px] text-gray-500 font-medium pt-0.5">
-                <span>{formatNumber(data.completesAchieved)} completes achieved</span>
-                <span>{formatNumber(data.targetCompletes)} target</span>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label
+                  className="text-xs font-bold uppercase tracking-wider text-gray-600"
+                  htmlFor="completes_so_far"
+                >
+                  Completes So Far *
+                </label>
+                <input
+                  id="completes_so_far"
+                  type="text"
+                  inputMode="numeric"
+                  className="calc-input !px-4 font-medium text-base focus:outline-none focus:border-[#E8442C] focus:ring-1 focus:ring-[#E8442C]"
+                  placeholder="0"
+                  value={completesInput}
+                  onChange={handleCompletesChange}
+                  onFocus={(e) => e.target.select()}
+                />
               </div>
+            )}
+          </div>
+
+          {/* Divider line */}
+          <div className="w-full h-px bg-[#E5E5E5] my-6"></div>
+
+          {/* Large, bold result with formula note underneath */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
+            <div className="flex flex-col">
+              <span
+                className={`text-base font-semibold transition-colors ${
+                  isInputEmpty ? 'text-gray-400' : 'text-[#2B2B2B]'
+                }`}
+              >
+                Invitations sent so far (estimate)
+              </span>
+              <span className="text-xs text-gray-500 font-medium">
+                {formulaNoteText}
+              </span>
             </div>
+            <span
+              className={`text-3xl md:text-4xl font-extrabold tracking-tight transition-colors ${
+                isInputEmpty ? 'text-gray-300' : 'text-[#2B2B2B]'
+              }`}
+            >
+              {isInputEmpty || invitationsSentResult === null ? '—' : formatNumber(invitationsSentResult)}
+            </span>
           </div>
         </section>
 
