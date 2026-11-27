@@ -1,4 +1,4 @@
-import { MarginData, MarginResults, InvitationData, InvitationResults, SmartRecommendation } from '../types';
+import { MarginData, MarginResults, InvitationData, InvitationResults, SmartRecommendation, CalculationDetail } from '../types';
 
 export function validateAndSanitizeMarginData(data: any): MarginData {
   const fallback: MarginData = {
@@ -11,6 +11,8 @@ export function validateAndSanitizeMarginData(data: any): MarginData {
       { id: '2', phase: 'Boost 1', completes: 100, cpi: 2.25 },
       { id: '3', phase: 'Boost 2', completes: 200, cpi: 5.00 },
     ],
+    committedCost: 0,
+    fixedCost: 0,
   };
 
   if (!data || typeof data !== 'object') {
@@ -58,12 +60,30 @@ export function validateAndSanitizeMarginData(data: any): MarginData {
       }))
     : [];
 
+  let committedCost = 0;
+  if (data.committedCost !== undefined && data.committedCost !== null && data.committedCost !== '') {
+    const parsedCommitted = Number(data.committedCost);
+    if (!isNaN(parsedCommitted) && isFinite(parsedCommitted) && parsedCommitted >= 0) {
+      committedCost = parsedCommitted;
+    }
+  }
+
+  let fixedCost = 0;
+  if (data.fixedCost !== undefined && data.fixedCost !== null && data.fixedCost !== '') {
+    const parsedFixed = Number(data.fixedCost);
+    if (!isNaN(parsedFixed) && isFinite(parsedFixed) && parsedFixed >= 0) {
+      fixedCost = parsedFixed;
+    }
+  }
+
   return {
     totalCompletes,
     clientCpi,
     targetMargin,
     incidenceRate,
     phases,
+    committedCost,
+    fixedCost,
   };
 }
 
@@ -97,49 +117,57 @@ export function calculateMarginResults(data: MarginData): MarginResults {
   const safeTargetMargin = Math.min(100, Math.max(0, isNaN(targetMargin) ? 0 : targetMargin));
   const safeIncidenceRate = Math.min(100, Math.max(0.1, isNaN(incidenceRate) ? 100 : incidenceRate));
 
-  // BUG #2 FIX: Single source of truth from CPI Change History table
+  // Single source of truth from CPI Change History table
   const phases = Array.isArray(data.phases) ? data.phases : [];
   const incurredCompletes = phases.reduce((sum, p) => sum + Math.max(0, Number(p.completes) || 0), 0);
-  const incurredCost = phases.reduce(
+  const incurredVariableCost = phases.reduce(
     (sum, p) => sum + (Math.max(0, Number(p.completes) || 0) * Math.max(0, Number(p.cpi) || 0)),
     0
   );
 
+  // Financial Model Extension: Committed but unpaid costs & Fixed project costs
+  const committedCost = Math.max(0, Number(data.committedCost) || 0);
+  const fixedCost = Math.max(0, Number(data.fixedCost) || 0);
+  const totalRecognizedCosts = incurredVariableCost + committedCost + fixedCost;
+  const incurredCost = totalRecognizedCosts; // Primary financial exposure
+
   // Core Financials
-  // BUG #1 FIX: Project Revenue = Total Completes Needed * Client CPI
+  // Project Revenue = Total Completes Needed * Client CPI
   const projectRevenue = safeTotalCompletes * safeClientCpi;
 
-  // BUG #1 ASSERTION: Verify that Project Revenue / Total Completes equals displayed Client CPI exactly
+  // Project Revenue assertion check: projectRevenue / totalCompletes === clientCpi
   const calculatedClientCpi = projectRevenue / safeTotalCompletes;
   const assertionPassed = Math.abs(calculatedClientCpi - safeClientCpi) < 0.00001;
   if (!assertionPassed) {
-    console.error(`BUG #1 Assertion Failure: Project Revenue (${projectRevenue}) / Total Completes (${safeTotalCompletes}) = ${calculatedClientCpi}, expected Client CPI (${safeClientCpi})`);
+    console.error(`Project Revenue assertion failed: ${projectRevenue} / ${safeTotalCompletes} = ${calculatedClientCpi} != ${safeClientCpi}`);
   }
 
   const allowedCost = projectRevenue * (1 - safeTargetMargin / 100);
-  const remainingBudget = allowedCost - incurredCost;
+  const remainingBudget = allowedCost - totalRecognizedCosts;
   const remainingCompletes = Math.max(0, safeTotalCompletes - incurredCompletes);
 
+  // Safeguards for zero remaining completes, exhausted budgets, and negative remaining budgets
+  const isBudgetExhausted = remainingBudget < 0;
+  const budgetDeficit = Math.max(0, -remainingBudget);
+
   let requiredFutureCpi = 0;
-  if (remainingCompletes > 0) {
+  if (remainingCompletes > 0 && remainingBudget > 0) {
     requiredFutureCpi = remainingBudget / remainingCompletes;
   }
 
-  // FEATURE #3: Breakeven Future CPI & Blended Margin to Date
   // Breakeven Future CPI (at 0% target margin, allowed cost = projectRevenue)
   const breakevenFutureCpi =
     remainingCompletes > 0
-      ? (projectRevenue - incurredCost) / remainingCompletes
+      ? (projectRevenue - totalRecognizedCosts) / remainingCompletes
       : safeClientCpi;
 
-  // Blended Margin to Date (%) = (Revenue attributable to completes collected - Incurred Cost) / Revenue attributable to completes collected
+  // Blended Margin to Date (%)
   const revenueToDate = incurredCompletes * safeClientCpi;
   let blendedMarginToDate: number | null = null;
   if (incurredCompletes > 0 && revenueToDate > 0) {
-    blendedMarginToDate = ((revenueToDate - incurredCost) / revenueToDate) * 100;
+    blendedMarginToDate = ((revenueToDate - totalRecognizedCosts) / revenueToDate) * 100;
   }
 
-  // FEATURE #1: Financial & Operational Feasibility Checks
   // Financial Feasibility Check
   const isFinanciallyFeasible =
     remainingBudget >= 0 &&
@@ -149,7 +177,7 @@ export function calculateMarginResults(data: MarginData): MarginResults {
   if (remainingCompletes === 0) {
     financialReason = 'Target completes already collected.';
   } else if (remainingBudget < 0) {
-    financialReason = `Incurred cost ($${incurredCost.toFixed(2)}) exceeds total allowed budget ($${allowedCost.toFixed(2)}).`;
+    financialReason = `Total recognized cost ($${totalRecognizedCosts.toFixed(2)}) exceeds total allowed budget ($${allowedCost.toFixed(2)}) by $${budgetDeficit.toFixed(2)} deficit. Zero budget remains for future completes.`;
   } else if (requiredFutureCpi <= 0) {
     financialReason = 'Required Future CPI is $0.00 or negative to hit target margin.';
   } else if (requiredFutureCpi > safeClientCpi) {
@@ -165,8 +193,6 @@ export function calculateMarginResults(data: MarginData): MarginResults {
   };
 
   // Operational Feasibility Check
-  // Market Research Heuristic: Minimum supplier market CPI scales inversely with sqrt(Incidence Rate)
-  // Baseline assumption: Standard general audience panel sample at 30% IR requires estimated $1.50 baseline CPI.
   const estimatedMinMarketCpi = 1.50 * Math.sqrt(30 / safeIncidenceRate);
 
   const isOperationallyFeasible =
@@ -175,6 +201,8 @@ export function calculateMarginResults(data: MarginData): MarginResults {
   let operationalReason = '';
   if (remainingCompletes === 0) {
     operationalReason = 'Target completes already collected.';
+  } else if (isBudgetExhausted) {
+    operationalReason = `Allowed budget is exhausted ($${budgetDeficit.toFixed(2)} deficit). Cannot purchase remaining completes at market rate ($${estimatedMinMarketCpi.toFixed(2)}).`;
   } else if (isOperationallyFeasible) {
     operationalReason = `Required CPI ($${requiredFutureCpi.toFixed(2)}) meets or exceeds estimated supplier market minimum ($${estimatedMinMarketCpi.toFixed(2)}) at ${safeIncidenceRate}% IR.`;
   } else {
@@ -188,9 +216,8 @@ export function calculateMarginResults(data: MarginData): MarginResults {
     reason: operationalReason,
   };
 
-  // FEATURE #2: Dynamic & Numeric Smart Recommendations
+  // Dynamic & Numeric Smart Recommendations
   const smartRecommendations: SmartRecommendation[] = [];
-
   const isOverallUnfeasible = !isFinanciallyFeasible || !isOperationallyFeasible;
 
   if (remainingCompletes === 0) {
@@ -201,13 +228,8 @@ export function calculateMarginResults(data: MarginData): MarginResults {
       type: 'info',
     });
   } else if (isOverallUnfeasible) {
-    // If Unfeasible: calculate specific options to close the gap.
-    // Minimum viable CPI required by market panel suppliers for this IR
     const minSupplierCpi = Math.max(estimatedMinMarketCpi, 0.50);
-
-    // Option (a): Renegotiate Client CPI
-    // Total cost needed = incurredCost + (remainingCompletes * minSupplierCpi)
-    const totalCostNeeded = incurredCost + remainingCompletes * minSupplierCpi;
+    const totalCostNeeded = totalRecognizedCosts + remainingCompletes * minSupplierCpi;
     const revenueNeededForMargin = totalCostNeeded / (1 - safeTargetMargin / 100);
     const neededClientCpi = revenueNeededForMargin / safeTotalCompletes;
     const cpiIncreasePerComplete = Math.max(0, neededClientCpi - safeClientCpi);
@@ -219,8 +241,6 @@ export function calculateMarginResults(data: MarginData): MarginResults {
       type: 'option_a',
     });
 
-    // Option (b): Lower Target Margin %
-    // Achievable margin at current Client CPI with minSupplierCpi
     const achievableMarginPct =
       ((projectRevenue - totalCostNeeded) / (projectRevenue || 1)) * 100;
     const formattedAchievableMargin = Math.max(0, achievableMarginPct).toFixed(1);
@@ -232,7 +252,6 @@ export function calculateMarginResults(data: MarginData): MarginResults {
       type: 'option_b',
     });
   } else {
-    // If Feasible: State numeric cushion and margin buffer
     const cushionPerComplete = safeClientCpi - requiredFutureCpi;
     const totalCushionDollar = cushionPerComplete * remainingCompletes;
     const marginBufferPct = ((safeClientCpi - requiredFutureCpi) / safeClientCpi) * 100;
@@ -253,10 +272,69 @@ export function calculateMarginResults(data: MarginData): MarginResults {
     });
   }
 
+  // Centralized Formula Transparency Metadata
+  const calculationDetails: Record<string, CalculationDetail> = {
+    projectRevenue: {
+      formula: 'Project Revenue = Total Completes Needed × Client CPI',
+      substitution: `${formatNumber(safeTotalCompletes)} × ${formatCurrency(safeClientCpi)}`,
+      finalResult: formatCurrency(projectRevenue),
+    },
+    allowedCost: {
+      formula: 'Allowed Cost = Project Revenue × (1 − Target Gross Margin %)',
+      substitution: `${formatCurrency(projectRevenue)} × (1 − ${(safeTargetMargin / 100).toFixed(2)}) = ${formatCurrency(projectRevenue)} × ${(1 - safeTargetMargin / 100).toFixed(2)}`,
+      finalResult: formatCurrency(allowedCost),
+    },
+    incurredCost: {
+      formula: 'Total Recognized Costs = Incurred Variable Cost + Committed Costs + Fixed Costs',
+      substitution: `${formatCurrency(incurredVariableCost)} (Variable) + ${formatCurrency(committedCost)} (Committed) + ${formatCurrency(fixedCost)} (Fixed)`,
+      finalResult: formatCurrency(totalRecognizedCosts),
+    },
+    remainingBudget: {
+      formula: 'Remaining Budget = Allowed Cost − Total Recognized Costs',
+      substitution: `${formatCurrency(allowedCost)} − ${formatCurrency(totalRecognizedCosts)}`,
+      finalResult: formatCurrency(remainingBudget),
+    },
+    requiredFutureCpi: {
+      formula: isBudgetExhausted
+        ? 'Allowable Future CPI = Max(Remaining Budget ÷ Remaining Completes, 0)'
+        : 'Maximum Allowable Future CPI = Remaining Budget ÷ Remaining Completes',
+      substitution: remainingCompletes === 0
+        ? '0 remaining completes. Project quota fulfilled.'
+        : isBudgetExhausted
+        ? `Max(${formatCurrency(remainingBudget)} ÷ ${formatNumber(remainingCompletes)}, 0) = Max(${(remainingBudget / remainingCompletes).toFixed(2)}, 0)`
+        : `${formatCurrency(remainingBudget)} ÷ ${formatNumber(remainingCompletes)}`,
+      unrounded: remainingCompletes > 0 ? formatCurrency(remainingBudget / remainingCompletes) : '$0.00',
+      finalResult: isBudgetExhausted ? '$0.00 (Exhausted Budget Deficit)' : formatCurrency(requiredFutureCpi),
+      notes: isBudgetExhausted
+        ? 'Negative allowable CPI is prohibited; allowable future CPI is capped at $0.00 when in deficit.'
+        : `Remaining Budget = Allowed Cost (${formatCurrency(allowedCost)}) − Total Recognized Costs (${formatCurrency(totalRecognizedCosts)}).`,
+    },
+    breakevenFutureCpi: {
+      formula: 'Breakeven Future CPI = (Project Revenue − Total Recognized Costs) ÷ Remaining Completes',
+      substitution: remainingCompletes > 0
+        ? `(${formatCurrency(projectRevenue)} − ${formatCurrency(totalRecognizedCosts)}) ÷ ${formatNumber(remainingCompletes)} = ${formatCurrency(projectRevenue - totalRecognizedCosts)} ÷ ${formatNumber(remainingCompletes)}`
+        : `${formatCurrency(safeClientCpi)} (Target completed)`,
+      unrounded: remainingCompletes > 0 ? formatCurrency((projectRevenue - totalRecognizedCosts) / remainingCompletes) : formatCurrency(safeClientCpi),
+      finalResult: formatCurrency(breakevenFutureCpi),
+    },
+    blendedMarginToDate: {
+      formula: 'Blended Margin To Date = (Revenue to Date − Total Recognized Costs) ÷ Revenue to Date',
+      substitution: revenueToDate > 0
+        ? `(${formatCurrency(revenueToDate)} − ${formatCurrency(totalRecognizedCosts)}) ÷ ${formatCurrency(revenueToDate)}`
+        : '0 completes collected to date.',
+      unrounded: blendedMarginToDate !== null ? `${blendedMarginToDate.toFixed(3)}%` : 'N/A',
+      finalResult: blendedMarginToDate !== null ? `${blendedMarginToDate.toFixed(1)}%` : 'N/A',
+    },
+  };
+
   return {
     projectRevenue,
     allowedCost,
-    incurredCost,
+    incurredCost: totalRecognizedCosts,
+    incurredVariableCost,
+    committedCost,
+    fixedCost,
+    totalRecognizedCosts,
     incurredCompletes,
     remainingBudget,
     remainingCompletes,
@@ -268,6 +346,9 @@ export function calculateMarginResults(data: MarginData): MarginResults {
     smartRecommendations,
     assertionPassed,
     validationErrors,
+    isBudgetExhausted,
+    budgetDeficit,
+    calculationDetails,
   };
 }
 
@@ -277,7 +358,11 @@ export function validateAndSanitizeInvitationData(data: any): InvitationData {
     bidIr: 20,
     infieldIr: 18,
     panelResponseRate: 8,
+    validCompletionRate: 100,
     completesAchieved: 0,
+    outstandingInvitations: 0,
+    invitationsAlreadySent: 0,
+    invitationBuffer: 0,
     trackProgressBy: 'entrants',
     totalEntrantsSoFar: null,
     completesSoFar: null,
@@ -293,23 +378,55 @@ export function validateAndSanitizeInvitationData(data: any): InvitationData {
   }
 
   let bidIr = Number(data.bidIr);
-  if (isNaN(bidIr) || !isFinite(bidIr) || bidIr < 0.1 || bidIr > 100) {
+  if (isNaN(bidIr) || !isFinite(bidIr) || bidIr < 0 || bidIr > 100) {
     bidIr = 20;
   }
 
   let infieldIr = Number(data.infieldIr);
-  if (isNaN(infieldIr) || !isFinite(infieldIr) || infieldIr < 0.1 || infieldIr > 100) {
+  if (isNaN(infieldIr) || !isFinite(infieldIr) || infieldIr < 0 || infieldIr > 100) {
     infieldIr = 18;
   }
 
   let panelResponseRate = Number(data.panelResponseRate);
-  if (isNaN(panelResponseRate) || !isFinite(panelResponseRate) || panelResponseRate < 0.1 || panelResponseRate > 100) {
-    panelResponseRate = 8;
+  if (data.panelResponseRate === undefined || data.panelResponseRate === null || data.panelResponseRate === '' || isNaN(panelResponseRate) || !isFinite(panelResponseRate) || panelResponseRate < 0 || panelResponseRate > 100) {
+    panelResponseRate = (data.panelResponseRate === 0 || Number(data.panelResponseRate) === 0) ? 0 : 8;
+  }
+
+  let validCompletionRate = 100;
+  if (data.validCompletionRate !== undefined && data.validCompletionRate !== null && data.validCompletionRate !== '') {
+    const parsedVcr = Number(data.validCompletionRate);
+    if (!isNaN(parsedVcr) && isFinite(parsedVcr) && parsedVcr > 0 && parsedVcr <= 100) {
+      validCompletionRate = parsedVcr;
+    }
   }
 
   let completesAchieved = Number(data.completesAchieved);
   if (isNaN(completesAchieved) || !isFinite(completesAchieved) || completesAchieved < 0) {
     completesAchieved = 0;
+  }
+
+  let outstandingInvitations = 0;
+  if (data.outstandingInvitations !== undefined && data.outstandingInvitations !== null && data.outstandingInvitations !== '') {
+    const parsedOut = Number(data.outstandingInvitations);
+    if (!isNaN(parsedOut) && isFinite(parsedOut) && parsedOut >= 0) {
+      outstandingInvitations = Math.max(0, parsedOut);
+    }
+  }
+
+  let invitationsAlreadySent = 0;
+  if (data.invitationsAlreadySent !== undefined && data.invitationsAlreadySent !== null && data.invitationsAlreadySent !== '') {
+    const parsedSent = Number(data.invitationsAlreadySent);
+    if (!isNaN(parsedSent) && isFinite(parsedSent) && parsedSent >= 0) {
+      invitationsAlreadySent = Math.max(0, parsedSent);
+    }
+  }
+
+  let invitationBuffer = 0;
+  if (data.invitationBuffer !== undefined && data.invitationBuffer !== null && data.invitationBuffer !== '') {
+    const parsedBuffer = Number(data.invitationBuffer);
+    if (!isNaN(parsedBuffer) && isFinite(parsedBuffer) && parsedBuffer >= 0 && parsedBuffer <= 50) {
+      invitationBuffer = parsedBuffer;
+    }
   }
 
   const trackProgressBy = data.trackProgressBy === 'completes' ? 'completes' : 'entrants';
@@ -335,7 +452,11 @@ export function validateAndSanitizeInvitationData(data: any): InvitationData {
     bidIr,
     infieldIr,
     panelResponseRate,
+    validCompletionRate,
     completesAchieved,
+    outstandingInvitations,
+    invitationsAlreadySent,
+    invitationBuffer,
     trackProgressBy,
     totalEntrantsSoFar,
     completesSoFar,
@@ -346,80 +467,315 @@ export function calculateInvitationResults(data: InvitationData): InvitationResu
   const validationErrors: Record<string, string> = {};
 
   const safeData = validateAndSanitizeInvitationData(data);
-  const { targetCompletes, bidIr, infieldIr, panelResponseRate, completesAchieved } = safeData;
+  const {
+    targetCompletes,
+    bidIr,
+    infieldIr,
+    panelResponseRate,
+    validCompletionRate = 100,
+    completesAchieved,
+    outstandingInvitations = 0,
+    invitationsAlreadySent = 0,
+    invitationBuffer = 0,
+  } = safeData;
 
-  // Validation error checks
-  if (typeof data.completesAchieved === 'number' && data.completesAchieved < 0) {
+  // Input validation
+  let isEstimateUnavailable = false;
+  let unavailableReason = '';
+
+  if (targetCompletes < 1) {
+    validationErrors.targetCompletes = 'Target completes must be at least 1.';
+  }
+  if (bidIr <= 0) {
+    validationErrors.bidIr = 'Bid IR must be greater than 0%.';
+  }
+  if (infieldIr <= 0) {
+    validationErrors.infieldIr = 'Infield IR must be greater than 0%.';
+    isEstimateUnavailable = true;
+    unavailableReason = 'Infield IR must be greater than 0% to calculate live invitations.';
+  }
+  if (panelResponseRate <= 0) {
+    validationErrors.panelResponseRate = 'Panel response rate must be greater than 0%.';
+    isEstimateUnavailable = true;
+    unavailableReason = 'Panel response rate must be greater than 0% to calculate invitations.';
+  }
+  if (validCompletionRate <= 0 || validCompletionRate > 100) {
+    validationErrors.validCompletionRate = 'Valid completion rate must be between 0.1% and 100%.';
+    isEstimateUnavailable = true;
+    unavailableReason = 'Valid completion rate must be greater than 0% to calculate invitations.';
+  }
+  if (completesAchieved < 0) {
     validationErrors.completesAchieved = 'Completes achieved cannot be negative.';
   }
-  if (data.completesAchieved > targetCompletes) {
-    validationErrors.completesAchievedExceedsTarget = `Completes achieved (${formatNumber(data.completesAchieved)}) cannot exceed target completes (${formatNumber(targetCompletes)}).`;
+  if (completesAchieved > targetCompletes) {
+    validationErrors.completesAchievedExceedsTarget = `Completes achieved (${formatNumber(completesAchieved)}) exceeds target completes (${formatNumber(targetCompletes)}). Target is fulfilled.`;
+  }
+  if (invitationBuffer < 0 || invitationBuffer > 50) {
+    validationErrors.invitationBuffer = 'Buffer percentage must be between 0% and 50%.';
   }
 
-  // Section 1: Bid Estimate
-  const validBidIr = bidIr > 0 ? bidIr / 100 : 0.01;
-  const validInfieldIr = infieldIr > 0 ? infieldIr / 100 : 0.01;
-  const validResponseRate = panelResponseRate > 0 ? panelResponseRate / 100 : 0.01;
+  // METHODOLOGY CORRECTION: Convert all percentages into decimal values
+  // Do not silently substitute positive rates if a rate is 0 or invalid
+  const validBidIr = bidIr > 0 ? bidIr / 100 : 0;
+  const validInfieldIr = infieldIr > 0 ? infieldIr / 100 : 0;
+  const validResponseRate = panelResponseRate > 0 ? panelResponseRate / 100 : 0;
+  const validCompletionRateDec = (validCompletionRate > 0 ? validCompletionRate : 100) / 100;
 
-  const bidParticipants = Math.ceil(targetCompletes / validBidIr);
-  const bidInvites = Math.ceil(bidParticipants / validResponseRate);
+  // Effective Entrant Yield = Qualification IR × Valid Completion Rate
+  // An entrant must qualify (IR) and complete validly (VCR) to produce an accepted complete.
+  // When VCR is 100% (or IR already measures valid completes), yield equals IR.
+  const effectiveEntrantYield = validInfieldIr * validCompletionRateDec;
+  const effectiveBidEntrantYield = validBidIr * validCompletionRateDec;
 
-  // Section 2: Live Performance Estimate
-  const liveParticipants = Math.ceil(targetCompletes / validInfieldIr);
-  const liveInvites = Math.ceil(liveParticipants / validResponseRate);
+  // ==========================================
+  // SECTION 1: BID ESTIMATE (Reference Figure)
+  // ==========================================
+  // Bid Survey Participants = Target Completes ÷ (Bid IR × Valid Completion Rate)
+  const bidParticipantsExact = effectiveBidEntrantYield > 0 ? targetCompletes / effectiveBidEntrantYield : 0;
+  const bidParticipants = Math.ceil(bidParticipantsExact);
 
-  // Section 3: Completes Progress So Far (legacy reference)
-  const remainingCompletesNeeded = Math.max(0, targetCompletes - completesAchieved);
-  const progressPercentage = targetCompletes > 0 ? Math.min(100, Math.max(0, (completesAchieved / targetCompletes) * 100)) : 0;
+  // Expected valid completes per bid invitation = Response Rate × Bid IR × Valid Completion Rate
+  const expectedCompletesPerInviteBid = validResponseRate * effectiveBidEntrantYield;
+  // Bid Invitations = Target Completes ÷ (Bid IR × Panel Response Rate × Valid Completion Rate)
+  // Round up (ceiling) only at final invitation count
+  const bidInvites = expectedCompletesPerInviteBid > 0
+    ? Math.ceil(targetCompletes / expectedCompletesPerInviteBid)
+    : 0;
 
-  // Planned yield rate as decimal: (infieldIr / 100) * (panelResponseRate / 100)
-  const plannedYieldRateDecimal = (infieldIr / 100) * (panelResponseRate / 100);
+  // ==================================================
+  // SECTION 2: LIVE PERFORMANCE ESTIMATE (Working Model)
+  // ==================================================
+  // Expected valid completes per infield invitation = Response Rate × Infield IR × Valid Completion Rate
+  const expectedValidCompletesPerInvite = validResponseRate * effectiveEntrantYield;
+
+  // Full-target survey participants expected for the full project: Target ÷ (Infield IR × Valid Completion Rate)
+  const liveParticipantsExact = effectiveEntrantYield > 0 ? targetCompletes / effectiveEntrantYield : 0;
+  const liveParticipants = Math.ceil(liveParticipantsExact);
+
+  // Remaining Completes = Max(Target Completes - Valid Completes Achieved, 0)
+  const remainingCompletes = Math.max(0, targetCompletes - completesAchieved);
+  const liveParticipantsRemaining = effectiveEntrantYield > 0 ? remainingCompletes / effectiveEntrantYield : 0;
+
+  // Forecast expected valid completes from outstanding invitations awaiting response
+  const expectedPendingCompletes = outstandingInvitations * expectedValidCompletesPerInvite;
+
+  // Remaining Completes After Expected Pending Conversions
+  const remainingCompletesAfterPending = Math.max(0, remainingCompletes - expectedPendingCompletes);
+
+  // Additional survey participants needed for remaining target (accounting for pending conversions)
+  // Net Completes Needed ÷ (Infield IR × Valid Completion Rate)
+  // Preserves full intermediate numerical precision and rounds only final whole-person output
+  const additionalParticipantsNeededExact = (effectiveEntrantYield > 0 && remainingCompletesAfterPending > 0)
+    ? remainingCompletesAfterPending / effectiveEntrantYield
+    : 0;
+  const additionalParticipantsNeeded = Math.ceil(additionalParticipantsNeededExact);
+
+  // Baseline Additional Invitations Required = Remaining Completes After Pending ÷ Expected Completes per Invitation
+  // Round up only at final whole-number invitation count
+  let baselineAdditionalInvites = 0;
+  if (remainingCompletesAfterPending > 0 && expectedValidCompletesPerInvite > 0) {
+    baselineAdditionalInvites = Math.ceil(remainingCompletesAfterPending / expectedValidCompletesPerInvite);
+  }
+
+  // Operational buffer: 0% to 50%
+  const bufferFraction = Math.min(0.50, Math.max(0, (invitationBuffer || 0) / 100));
+  const bufferedAdditionalInvites = Math.ceil(baselineAdditionalInvites * (1 + bufferFraction));
+
+  // The primary working live invitation estimate
+  const liveInvites = bufferedAdditionalInvites;
+
+  // Total projected project invitations (if invitations already sent is supplied)
+  const totalProjectedInvites =
+    invitationsAlreadySent > 0
+      ? invitationsAlreadySent + bufferedAdditionalInvites
+      : (completesAchieved === 0 && outstandingInvitations === 0 ? bufferedAdditionalInvites : null);
+
+  // Legacy reference & progress metrics
+  const remainingCompletesNeeded = remainingCompletes;
+  const progressPercentage = targetCompletes > 0
+    ? Math.min(100, Math.max(0, (completesAchieved / targetCompletes) * 100))
+    : 0;
+
   let estimatedInvitesSent: number | null = null;
-  if (plannedYieldRateDecimal > 0) {
-    estimatedInvitesSent = Math.ceil(completesAchieved / plannedYieldRateDecimal);
+  if (expectedValidCompletesPerInvite > 0 && completesAchieved > 0) {
+    estimatedInvitesSent = Math.ceil(completesAchieved / expectedValidCompletesPerInvite);
   }
 
-  // Stage 3: Progress Tracker Calculation
+  // ==========================================
+  // SECTION 3: PROGRESS TRACKER CALCULATION
+  // ==========================================
   const trackProgressBy = safeData.trackProgressBy === 'completes' ? 'completes' : 'entrants';
-  let progressInvitationsSent: number | null = null;
+  let progressInvitationsEstimated: number | null = null;
+  const progressInvitationsRecorded: number | null =
+    safeData.invitationsAlreadySent !== undefined && safeData.invitationsAlreadySent !== null && safeData.invitationsAlreadySent > 0
+      ? safeData.invitationsAlreadySent
+      : null;
+
   const progressFormulaNote =
     trackProgressBy === 'completes'
-      ? 'Completes ÷ Infield IR ÷ Panel Response Rate'
+      ? 'Completes ÷ (Infield IR × Panel Response Rate × Valid Completion Rate)'
       : 'Total Entrants ÷ Panel Response Rate';
 
   if (trackProgressBy === 'entrants') {
     if (safeData.totalEntrantsSoFar !== null && safeData.totalEntrantsSoFar !== undefined) {
       const entrants = Number(safeData.totalEntrantsSoFar);
       if (!isNaN(entrants) && validResponseRate > 0) {
-        progressInvitationsSent = Math.ceil(entrants / validResponseRate);
+        progressInvitationsEstimated = Math.ceil(entrants / validResponseRate);
       }
     }
   } else {
     if (safeData.completesSoFar !== null && safeData.completesSoFar !== undefined) {
       const completes = Number(safeData.completesSoFar);
-      if (!isNaN(completes) && validInfieldIr > 0 && validResponseRate > 0) {
-        progressInvitationsSent = Math.ceil((completes / validInfieldIr) / validResponseRate);
+      if (!isNaN(completes) && expectedValidCompletesPerInvite > 0) {
+        // Consistent with Stage 2 conversion model including valid completion rate
+        progressInvitationsEstimated = Math.ceil(completes / expectedValidCompletesPerInvite);
       }
     }
   }
 
+  // If actual recorded invitations are available, use actual count rather than replacing it with theoretical estimate
+  const progressIsActual = progressInvitationsRecorded !== null;
+  const progressInvitationsSent = progressIsActual ? progressInvitationsRecorded : progressInvitationsEstimated;
+
   // Sanity check assertion
-  const plannedYieldRate = plannedYieldRateDecimal * 100;
-  const expectedYieldFromLiveInvites = (targetCompletes / (liveInvites || 1)) * 100;
-  const assertionPassed = Math.abs(plannedYieldRate - expectedYieldFromLiveInvites) < 0.1;
+  const plannedYieldRate = expectedValidCompletesPerInvite * 100;
+  const fullLifetimeInvites = expectedValidCompletesPerInvite > 0
+    ? Math.ceil(targetCompletes / expectedValidCompletesPerInvite)
+    : 1;
+  const expectedYieldFromFullInvites = (targetCompletes / fullLifetimeInvites) * 100;
+  const assertionPassed = Math.abs(plannedYieldRate - expectedYieldFromFullInvites) < 0.2;
+
+  // Centralized Formula Transparency Metadata
+  const calculationDetails: Record<string, CalculationDetail> = {
+    bidParticipants: {
+      formula: validCompletionRateDec < 1
+        ? 'Bid Participants = ⌈ Target Completes ÷ (Bid IR × Valid Completion Rate) ⌉'
+        : 'Bid Participants = ⌈ Target Completes ÷ Bid IR ⌉',
+      substitution: validCompletionRateDec < 1
+        ? `${formatNumber(targetCompletes)} ÷ (${(validBidIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${formatNumber(targetCompletes)} ÷ ${(effectiveBidEntrantYield).toFixed(6).replace(/\.?0+$/, '')}`
+        : `${formatNumber(targetCompletes)} ÷ ${(validBidIr).toFixed(4).replace(/\.?0+$/, '')} (${bidIr}%)`,
+      unrounded: effectiveBidEntrantYield > 0 ? (targetCompletes / effectiveBidEntrantYield).toFixed(2) : '0',
+      finalResult: formatNumber(bidParticipants),
+      notes: 'Preserves floating-point precision throughout intermediate calculations.',
+    },
+    bidInvites: {
+      formula: 'Bid Invitations = ⌈ Target Completes ÷ (Bid IR × Response Rate × Valid Completion Rate) ⌉',
+      substitution: `${formatNumber(targetCompletes)} ÷ (${(validBidIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validResponseRate).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${formatNumber(targetCompletes)} ÷ ${(expectedCompletesPerInviteBid).toFixed(6).replace(/\.?0+$/, '')}`,
+      unrounded: expectedCompletesPerInviteBid > 0 ? (targetCompletes / expectedCompletesPerInviteBid).toFixed(2) : '0',
+      finalResult: formatNumber(bidInvites),
+      notes: 'Ceiling rounding (⌈ ⌉) applied only to final whole-number count.',
+    },
+    remainingCompletes: {
+      formula: 'Remaining Completes = Max(Target Completes − Valid Completes Achieved, 0)',
+      substitution: `Max(${formatNumber(targetCompletes)} − ${formatNumber(completesAchieved)}, 0)`,
+      finalResult: formatNumber(remainingCompletes),
+    },
+    expectedPendingCompletes: {
+      formula: 'Pending Conversions = Outstanding Invitations × (Response Rate × Infield IR × Valid Completion Rate)',
+      substitution: `${formatNumber(outstandingInvitations)} × (${(validResponseRate).toFixed(4).replace(/\.?0+$/, '')} × ${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${formatNumber(outstandingInvitations)} × ${(expectedValidCompletesPerInvite).toFixed(6).replace(/\.?0+$/, '')}`,
+      unrounded: expectedPendingCompletes.toFixed(3),
+      finalResult: `~${expectedPendingCompletes > 0 ? (Math.round(expectedPendingCompletes * 10) / 10).toFixed(1) : '0'}`,
+    },
+    additionalParticipants: {
+      formula: validCompletionRateDec < 1
+        ? 'Additional Participants = ⌈ Net Completes Needed ÷ (Qualification IR × Valid Completion Rate) ⌉'
+        : 'Additional Participants = ⌈ Net Completes Needed ÷ Qualification IR ⌉',
+      substitution: isEstimateUnavailable
+        ? `Estimate unavailable: ${unavailableReason}`
+        : validCompletionRateDec < 1
+        ? `${remainingCompletesAfterPending.toFixed(2)} ÷ (${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${remainingCompletesAfterPending.toFixed(2)} ÷ ${(effectiveEntrantYield).toFixed(6).replace(/\.?0+$/, '')}`
+        : `${remainingCompletesAfterPending.toFixed(2)} ÷ ${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} (${infieldIr}%)`,
+      unrounded: isEstimateUnavailable ? 'N/A' : additionalParticipantsNeededExact.toFixed(2),
+      finalResult: isEstimateUnavailable ? '—' : formatNumber(additionalParticipantsNeeded),
+      notes: 'Calculated from net completes needed after deducting expected pending conversions.',
+    },
+    fullProjectParticipants: {
+      formula: validCompletionRateDec < 1
+        ? 'Full Project Participants = ⌈ Target Completes ÷ (Qualification IR × Valid Completion Rate) ⌉'
+        : 'Full Project Participants = ⌈ Target Completes ÷ Qualification IR ⌉',
+      substitution: isEstimateUnavailable
+        ? `Estimate unavailable: ${unavailableReason}`
+        : validCompletionRateDec < 1
+        ? `${formatNumber(targetCompletes)} ÷ (${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${formatNumber(targetCompletes)} ÷ ${(effectiveEntrantYield).toFixed(6).replace(/\.?0+$/, '')}`
+        : `${formatNumber(targetCompletes)} ÷ ${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} (${infieldIr}%)`,
+      unrounded: isEstimateUnavailable ? 'N/A' : liveParticipantsExact.toFixed(2),
+      finalResult: isEstimateUnavailable ? '—' : formatNumber(liveParticipants),
+      notes: 'Total survey entrants expected across the entire study lifetime.',
+    },
+    liveInvites: {
+      formula: bufferFraction > 0
+        ? 'Buffered Additional Invitations = ⌈ Baseline Additional Invitations × (1 + Buffer %) ⌉, where Baseline = ⌈ Net Completes Needed ÷ (Response Rate × Qualification IR × Valid Completion Rate) ⌉'
+        : 'Additional Invitations = ⌈ Net Completes Needed ÷ (Response Rate × Qualification IR × Valid Completion Rate) ⌉',
+      substitution: isEstimateUnavailable
+        ? `Estimate unavailable: ${unavailableReason}`
+        : `${remainingCompletesAfterPending.toFixed(2)} ÷ (${(validResponseRate).toFixed(4).replace(/\.?0+$/, '')} × ${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${remainingCompletesAfterPending.toFixed(2)} ÷ ${(expectedValidCompletesPerInvite).toFixed(6).replace(/\.?0+$/, '')}${bufferFraction > 0 ? ` → ${formatNumber(baselineAdditionalInvites)} baseline × (1 + ${bufferFraction.toFixed(2)})` : ''}`,
+      unrounded: isEstimateUnavailable
+        ? 'N/A'
+        : expectedValidCompletesPerInvite > 0
+        ? `${(remainingCompletesAfterPending / expectedValidCompletesPerInvite).toFixed(2)} baseline${bufferFraction > 0 ? ` (buffered: ${(baselineAdditionalInvites * (1 + bufferFraction)).toFixed(2)})` : ''}`
+        : '0',
+      finalResult: isEstimateUnavailable ? '—' : formatNumber(bufferedAdditionalInvites),
+      notes: isEstimateUnavailable
+        ? unavailableReason
+        : `Yield per invitation = ${(expectedValidCompletesPerInvite * 100).toFixed(4)}%. Round up (ceiling) only at final invitation count. Cumulative requirement, not a single batch release.`,
+    },
+    progressInvitations: {
+      formula: progressIsActual
+        ? 'Recorded Actual Dispatches from Project Parameters'
+        : trackProgressBy === 'entrants'
+        ? 'Invitations Sent = ⌈ Total Entrants ÷ Panel Response Rate ⌉'
+        : 'Invitations Sent = ⌈ Completes ÷ (Qualification IR × Panel Response Rate × Valid Completion Rate) ⌉',
+      substitution: progressIsActual
+        ? `Actual recorded cumulative invitations = ${formatNumber(progressInvitationsRecorded!)} (Entered in Project Parameters)`
+        : trackProgressBy === 'entrants'
+        ? `${formatNumber(Number(safeData.totalEntrantsSoFar))} ÷ ${(validResponseRate).toFixed(4).replace(/\.?0+$/, '')} (${panelResponseRate}%)`
+        : `${formatNumber(Number(safeData.completesSoFar))} ÷ (${(validInfieldIr).toFixed(4).replace(/\.?0+$/, '')} × ${(validResponseRate).toFixed(4).replace(/\.?0+$/, '')} × ${(validCompletionRateDec).toFixed(4).replace(/\.?0+$/, '')}) = ${formatNumber(Number(safeData.completesSoFar))} ÷ ${(expectedValidCompletesPerInvite).toFixed(6).replace(/\.?0+$/, '')}`,
+      unrounded: progressIsActual
+        ? 'Recorded count'
+        : trackProgressBy === 'entrants'
+        ? validResponseRate > 0
+          ? (Number(safeData.totalEntrantsSoFar) / validResponseRate).toFixed(2)
+          : '0'
+        : expectedValidCompletesPerInvite > 0
+        ? (Number(safeData.completesSoFar) / expectedValidCompletesPerInvite).toFixed(2)
+        : '0',
+      finalResult: progressInvitationsSent !== null ? formatNumber(progressInvitationsSent) : '—',
+      notes: progressIsActual
+        ? `Theoretical estimate from current ${trackProgressBy}: ${progressInvitationsEstimated !== null ? formatNumber(progressInvitationsEstimated) : '—'} (${progressFormulaNote})`
+        : 'Round up (ceiling) only at final invitation count.',
+    },
+  };
 
   return {
     bidParticipants,
+    bidParticipantsExact,
     bidInvites,
     liveParticipants,
+    liveParticipantsExact,
+    liveParticipantsRemaining,
+    additionalParticipantsNeeded,
+    additionalParticipantsNeededExact,
+    remainingCompletes,
+    expectedPendingCompletes,
+    remainingCompletesAfterPending,
+    expectedValidCompletesPerInvite,
+    baselineAdditionalInvites,
+    bufferedAdditionalInvites,
     liveInvites,
+    totalProjectedInvites,
+    isEstimateUnavailable,
+    unavailableReason,
     remainingCompletesNeeded,
     estimatedInvitesSent,
     progressPercentage,
     progressInvitationsSent,
+    progressInvitationsEstimated,
+    progressInvitationsRecorded,
+    progressIsActual,
     progressFormulaNote,
     assertionPassed,
     validationErrors,
+    calculationDetails,
   };
 }
 

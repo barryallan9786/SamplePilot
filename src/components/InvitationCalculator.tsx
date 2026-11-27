@@ -2,6 +2,7 @@ import React from 'react';
 import { InvitationData } from '../types';
 import { calculateInvitationResults, formatNumber } from '../utils/calculations';
 import { NumericInput } from './NumericInput';
+import { ViewCalculation } from './ViewCalculation';
 
 interface InvitationCalculatorProps {
   data: InvitationData;
@@ -24,6 +25,9 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
   };
 
   const trackBy = data.trackProgressBy || 'entrants';
+
+  // Collapsible Advanced Settings (defaults to collapsed false)
+  const [isAdvancedOpen, setIsAdvancedOpen] = React.useState<boolean>(false);
 
   // Input states allowing smooth numeric typing & clean empty detection
   const [entrantsInput, setEntrantsInput] = React.useState<string>(() =>
@@ -132,10 +136,14 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
       <div className="max-w-[880px] mx-auto px-4 md:px-6 -mt-6 relative z-10 pb-20 flex flex-col gap-8">
         {/* Project Parameters Card */}
         <section className="calc-card shadow-md">
-          <h2 className="text-xl font-bold text-[#2B2B2B] mb-6 border-b border-[#E5E5E5] pb-4">
-            Project Parameters
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          <div className="mb-6 border-b border-[#E5E5E5] pb-4">
+            <h2 className="text-xl font-bold text-[#2B2B2B]">
+              Project Parameters
+            </h2>
+          </div>
+
+          {/* Primary 4 Parameters in a Clean Two-Column Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             {/* Target Completes */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="target_completes">
@@ -152,10 +160,10 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
               />
             </div>
 
-            {/* Bid IR (client-shared) */}
+            {/* Bid IR (Client-Shared) */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="bid_ir">
-                Bid IR (client-shared) *
+                Bid IR (Client-Shared) *
               </label>
               <div className="relative flex items-center">
                 <NumericInput
@@ -171,11 +179,24 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
               </div>
             </div>
 
-            {/* Infield IR (actual performance) */}
+            {/* Infield IR (Actual Performance) */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="infield_ir">
-                Infield IR (actual performance)
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="infield_ir">
+                  Infield IR (Actual Performance) *
+                </label>
+                <div className="group relative inline-flex items-center">
+                  <span
+                    className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                    aria-label="Infield IR info"
+                  >
+                    info
+                  </span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-64 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                    % of survey entrants qualifying for the study. If reported IR already accounts for mid-survey dropouts and quality cleans, leave Valid Completion Rate at 100% to avoid double-counting.
+                  </div>
+                </div>
+              </div>
               <div className="relative flex items-center">
                 <NumericInput
                   id="infield_ir"
@@ -192,9 +213,22 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
 
             {/* Panel Response Rate */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="panel_response_rate">
-                Panel Response Rate *
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="panel_response_rate">
+                  Panel Response Rate *
+                </label>
+                <div className="group relative inline-flex items-center">
+                  <span
+                    className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                    aria-label="Panel response rate info"
+                  >
+                    info
+                  </span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-56 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                    Percentage of delivered invitations that enter the survey.
+                  </div>
+                </div>
+              </div>
               <div className="relative flex items-center">
                 <NumericInput
                   id="panel_response_rate"
@@ -209,6 +243,184 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Collapsible Advanced Settings */}
+          <div className="mt-6 pt-4 border-t border-[#E5E5E5]">
+            <button
+              type="button"
+              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+              className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-[#E8442C] transition-colors focus:outline-none select-none cursor-pointer py-1"
+              aria-expanded={isAdvancedOpen}
+            >
+              <span
+                className="material-symbols-outlined text-[18px] transition-transform duration-200"
+                style={{ transform: isAdvancedOpen ? 'rotate(180deg)' : 'none' }}
+              >
+                expand_more
+              </span>
+              <span>Advanced Settings</span>
+            </button>
+
+            {isAdvancedOpen && (
+              <div className="mt-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+                  {/* Valid Completion Rate (default 100%) */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="valid_completion_rate">
+                        Valid Completion Rate
+                      </label>
+                      <span className="text-[10px] bg-gray-100 text-gray-600 font-bold px-1.5 py-0.5 rounded">
+                        100%
+                      </span>
+                      <div className="group relative inline-flex items-center">
+                        <span
+                          className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                          aria-label="Valid completion rate info"
+                        >
+                          info
+                        </span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-64 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                          % of qualified respondents generating accepted completes. Adjust &lt; 100% only if Infield IR reflects screener eligibility only.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="relative flex items-center">
+                      <NumericInput
+                        id="valid_completion_rate"
+                        className="calc-input !pl-4 !pr-10 font-medium text-base"
+                        placeholder="100"
+                        value={data.validCompletionRate ?? 100}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(val) => handleFieldChange('validCompletionRate', val)}
+                        isDecimal={true}
+                      />
+                      <span className="absolute right-3.5 text-gray-500 font-bold text-base pointer-events-none select-none z-10">%</span>
+                    </div>
+                  </div>
+
+                  {/* Invitation Buffer (default 0%) */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="invitation_buffer">
+                        Invitation Buffer (0-50%)
+                      </label>
+                      <div className="group relative inline-flex items-center">
+                        <span
+                          className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                          aria-label="Invitation buffer info"
+                        >
+                          info
+                        </span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-56 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                          Operational safety margin allowance (0–50%) for sampling uncertainty.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="relative flex items-center">
+                      <NumericInput
+                        id="invitation_buffer"
+                        className="calc-input !pl-4 !pr-10 font-medium text-base"
+                        placeholder="0"
+                        value={data.invitationBuffer ?? 0}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(val) => handleFieldChange('invitationBuffer', Math.min(50, Math.max(0, val)))}
+                        isDecimal={true}
+                      />
+                      <span className="absolute right-3.5 text-gray-500 font-bold text-base pointer-events-none select-none z-10">%</span>
+                    </div>
+                  </div>
+
+                  {/* Valid Completes Achieved */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="completes_achieved">
+                        Valid Completes Achieved
+                      </label>
+                      <div className="group relative inline-flex items-center">
+                        <span
+                          className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                          aria-label="Completes achieved info"
+                        >
+                          info
+                        </span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-56 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                          Accepted valid completes banked so far in live fieldwork.
+                        </div>
+                      </div>
+                    </div>
+                    <NumericInput
+                      id="completes_achieved"
+                      className="calc-input !px-4 font-medium text-base"
+                      placeholder="0"
+                      value={data.completesAchieved ?? 0}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(val) => handleFieldChange('completesAchieved', Math.max(0, val))}
+                      isDecimal={false}
+                    />
+                  </div>
+
+                  {/* Outstanding Invitations Pending */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="outstanding_invitations">
+                        Outstanding Invitations Pending
+                      </label>
+                      <div className="group relative inline-flex items-center">
+                        <span
+                          className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                          aria-label="Outstanding invitations info"
+                        >
+                          info
+                        </span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-64 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                          Genuinely pending invitations still in-field awaiting response (unexpired and not yet converted).
+                        </div>
+                      </div>
+                    </div>
+                    <NumericInput
+                      id="outstanding_invitations"
+                      className="calc-input !px-4 font-medium text-base"
+                      placeholder="0"
+                      value={data.outstandingInvitations ?? 0}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(val) => handleFieldChange('outstandingInvitations', Math.max(0, val))}
+                      isDecimal={false}
+                    />
+                  </div>
+
+                  {/* Invitations Already Sent (Total) */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-600" htmlFor="invitations_already_sent">
+                        Invitations Already Sent (Total)
+                      </label>
+                      <div className="group relative inline-flex items-center">
+                        <span
+                          className="material-symbols-outlined text-[16px] text-gray-400 hover:text-gray-600 cursor-help transition-colors select-none"
+                          aria-label="Invitations already sent info"
+                        >
+                          info
+                        </span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-30 w-56 p-2 bg-[#2B2B2B] text-white text-[11px] font-normal rounded-lg shadow-lg pointer-events-none leading-snug">
+                          Cumulative invitations dispatched to date recorded by sample supplier.
+                        </div>
+                      </div>
+                    </div>
+                    <NumericInput
+                      id="invitations_already_sent"
+                      className="calc-input !px-4 font-medium text-base"
+                      placeholder="0"
+                      value={data.invitationsAlreadySent ?? 0}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(val) => handleFieldChange('invitationsAlreadySent', Math.max(0, val))}
+                      isDecimal={false}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Stage 1 — Bid Estimate Card */}
@@ -219,31 +431,45 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-[#2B2B2B]">Bid Estimate</h2>
-              <p className="text-xs text-gray-500 font-medium">Reference figure — what the client quoted at bid stage</p>
+              <p className="text-xs text-gray-500 font-medium">Reference figure — based on original client-shared Bid IR assuming 0 completes collected</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center py-2">
-              <div className="flex flex-col">
-                <span className="text-base font-semibold text-[#2B2B2B]">Survey participants needed</span>
-                <span className="text-xs text-gray-500 font-medium">Target ÷ Bid IR</span>
+            <div className="flex flex-col py-2">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-base font-semibold text-[#2B2B2B]">Survey participants needed</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {(data.validCompletionRate ?? 100) < 100
+                      ? 'Target Completes ÷ (Bid IR × Valid Completion Rate)'
+                      : 'Target Completes ÷ Bid IR'}
+                  </span>
+                </div>
+                <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
+                  {formatNumber(results.bidParticipants)}
+                </span>
               </div>
-              <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
-                {formatNumber(results.bidParticipants)}
-              </span>
+              {results.calculationDetails?.bidParticipants && (
+                <ViewCalculation {...results.calculationDetails.bidParticipants} />
+              )}
             </div>
 
             <div className="w-full h-px bg-[#E5E5E5]"></div>
 
-            <div className="flex justify-between items-center py-2">
-              <div className="flex flex-col">
-                <span className="text-base font-semibold text-[#2B2B2B]">Estimated invites (reference only)</span>
-                <span className="text-xs text-gray-500 font-medium">Participants ÷ Panel Response Rate</span>
+            <div className="flex flex-col py-2">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-base font-semibold text-[#2B2B2B]">Estimated invites (reference only)</span>
+                  <span className="text-xs text-gray-500 font-medium">Target ÷ (Bid IR × Panel Response Rate × Valid Completion Rate)</span>
+                </div>
+                <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
+                  {formatNumber(results.bidInvites)}
+                </span>
               </div>
-              <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
-                {formatNumber(results.bidInvites)}
-              </span>
+              {results.calculationDetails?.bidInvites && (
+                <ViewCalculation {...results.calculationDetails.bidInvites} />
+              )}
             </div>
           </div>
         </section>
@@ -256,29 +482,66 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-[#2B2B2B]">Live Performance Estimate</h2>
-              <p className="text-xs text-gray-600 font-medium">Working number — based on actual infield IR once fielding starts</p>
+              <p className="text-xs text-gray-600 font-medium">Working number — based on actual infield performance and remaining target</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center">
-              <div className="flex flex-col">
-                <span className="text-base font-semibold text-[#2B2B2B]">Survey participants expected</span>
-                <span className="text-xs text-gray-600 font-medium">Target ÷ Infield IR</span>
+            {/* Result 1: Survey Participants Expected */}
+            <div className="flex flex-col py-1">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-base font-semibold text-[#2B2B2B]">Survey participants expected</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {(data.validCompletionRate ?? 100) < 100
+                      ? 'Target Completes ÷ (Infield IR × Valid Completion Rate)'
+                      : 'Target Completes ÷ Infield IR'}
+                  </span>
+                </div>
+                <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
+                  {results.isEstimateUnavailable ? '—' : formatNumber(Math.ceil(results.liveParticipantsExact))}
+                </span>
               </div>
-              <span className="text-xl md:text-2xl font-bold text-[#2B2B2B]">
-                {formatNumber(results.liveParticipants)}
-              </span>
+              {!results.isEstimateUnavailable && results.calculationDetails?.fullProjectParticipants && (
+                <ViewCalculation {...results.calculationDetails.fullProjectParticipants} />
+              )}
             </div>
 
-            <div className="bg-white rounded-xl p-6 border-2 border-[#E8442C] border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-[#E8442C]">Invites to release</span>
-                <span className="text-xs text-gray-500 font-medium">Participants ÷ Panel Response Rate</span>
+            {/* Result 2: Invites to Release inside prominent red dashed-border container */}
+            <div className="bg-white rounded-xl p-6 border-2 border-[#E8442C] border-dashed flex flex-col gap-3 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-[#E8442C]">
+                    Invites to Release
+                  </span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Remaining Completes After Pending Conversions ÷ Expected Valid Completes per New Invitation
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl md:text-4xl font-extrabold text-[#E8442C] tracking-tight block">
+                    {results.isEstimateUnavailable ? '—' : formatNumber(results.bufferedAdditionalInvites)}
+                  </span>
+                  {!results.isEstimateUnavailable && data.invitationBuffer && data.invitationBuffer > 0 ? (
+                    <span className="text-[11px] font-bold text-[#2B2B2B] bg-[#FDF0EE] px-2.5 py-0.5 rounded-full inline-block mt-1">
+                      Includes {data.invitationBuffer}% buffer
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              <span className="text-3xl md:text-4xl font-extrabold text-[#E8442C] tracking-tight">
-                {formatNumber(results.liveInvites)}
-              </span>
+
+              {/* ViewCalculation for Invites to Release */}
+              {!results.isEstimateUnavailable && results.calculationDetails?.liveInvites && (
+                <ViewCalculation {...results.calculationDetails.liveInvites} />
+              )}
+
+              {/* Unavailable State Notice */}
+              {results.isEstimateUnavailable && (
+                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 font-medium flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">warning</span>
+                  <span>Cannot calculate live invitations: {results.unavailableReason}</span>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -386,15 +649,30 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
           {/* Large, bold result with formula note underneath */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
             <div className="flex flex-col">
-              <span
-                className={`text-base font-semibold transition-colors ${
-                  isInputEmpty ? 'text-gray-400' : 'text-[#2B2B2B]'
-                }`}
-              >
-                Invitations sent so far (estimate)
-              </span>
-              <span className="text-xs text-gray-500 font-medium">
-                {formulaNoteText}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-base font-semibold transition-colors ${
+                    isInputEmpty ? 'text-gray-400' : 'text-[#2B2B2B]'
+                  }`}
+                >
+                  {results.progressIsActual
+                    ? 'Invitations sent so far (recorded actual)'
+                    : 'Invitations sent so far (estimate)'}
+                </span>
+                {results.progressIsActual && !isInputEmpty && (
+                  <span className="text-[10px] font-bold bg-[#FDF0EE] text-[#E8442C] border border-[#E8442C]/30 px-2 py-0.5 rounded-full">
+                    Recorded Actual
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-gray-500 font-medium mt-0.5">
+                {results.progressIsActual
+                  ? `Actual count recorded in Project Parameters · Theoretical estimate: ${
+                      results.progressInvitationsEstimated !== null
+                        ? formatNumber(results.progressInvitationsEstimated)
+                        : '—'
+                    } (${results.progressFormulaNote})`
+                  : results.progressFormulaNote}
               </span>
             </div>
             <span
@@ -402,9 +680,16 @@ export const InvitationCalculator: React.FC<InvitationCalculatorProps> = ({
                 isInputEmpty ? 'text-gray-300' : 'text-[#2B2B2B]'
               }`}
             >
-              {isInputEmpty || invitationsSentResult === null ? '—' : formatNumber(invitationsSentResult)}
+              {isInputEmpty || results.progressInvitationsSent === null
+                ? '—'
+                : formatNumber(results.progressInvitationsSent)}
             </span>
           </div>
+
+          {/* ViewCalculation for Stage 3 */}
+          {!isInputEmpty && results.progressInvitationsSent !== null && results.calculationDetails?.progressInvitations && (
+            <ViewCalculation {...results.calculationDetails.progressInvitations} />
+          )}
         </section>
 
         {/* Footnote */}

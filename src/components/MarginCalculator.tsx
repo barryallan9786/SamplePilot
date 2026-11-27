@@ -2,6 +2,7 @@ import React from 'react';
 import { MarginData, CpiPhase } from '../types';
 import { calculateMarginResults, formatCurrency, formatNumber } from '../utils/calculations';
 import { NumericInput } from './NumericInput';
+import { ViewCalculation } from './ViewCalculation';
 
 interface MarginCalculatorProps {
   data: MarginData;
@@ -319,11 +320,72 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
                   <tr className="bg-gray-50/80 text-xs font-bold text-[#2B2B2B]">
                     <td className="p-3">Phase Totals:</td>
                     <td className="p-3">{formatNumber(results.incurredCompletes)} completes</td>
-                    <td className="p-3">{formatCurrency(results.incurredCost)} spent</td>
+                    <td className="p-3">{formatCurrency(results.incurredVariableCost)} variable spent</td>
                     <td></td>
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </section>
+
+          {/* Section 3: Committed & Fixed Costs (Optional) */}
+          <section className="calc-card">
+            <div className="flex justify-between items-center mb-4 border-b border-[#E5E5E5] pb-3">
+              <div>
+                <h2 className="text-xl font-bold text-[#2B2B2B]">Committed & Fixed Costs</h2>
+                <p className="text-xs text-gray-500 font-normal">
+                  Optional non-variable costs: account for guaranteed supplier commitments and project setup fees
+                </p>
+              </div>
+              <span className="text-[10px] bg-gray-100 text-gray-600 font-bold px-2 py-0.5 rounded">
+                Optional
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              {/* Committed Supplier Costs */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#2B2B2B]" htmlFor="committed_cost">
+                  Committed Supplier Costs ($)
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-gray-500 font-bold text-base pointer-events-none select-none z-10">$</span>
+                  <NumericInput
+                    id="committed_cost"
+                    className="calc-input !pl-8 !pr-4 font-medium text-base"
+                    placeholder="0.00"
+                    value={data.committedCost ?? 0}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(val) => handleFieldChange('committedCost', Math.max(0, val))}
+                    isDecimal={true}
+                  />
+                </div>
+                <span className="text-[11px] text-gray-500 leading-tight">
+                  Guaranteed supplier purchase orders or minimum fees. Do <strong>not</strong> re-enter sample costs already recorded in the phase history above.
+                </span>
+              </div>
+
+              {/* Fixed Project Costs */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#2B2B2B]" htmlFor="fixed_cost">
+                  Fixed Project Costs ($)
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-gray-500 font-bold text-base pointer-events-none select-none z-10">$</span>
+                  <NumericInput
+                    id="fixed_cost"
+                    className="calc-input !pl-8 !pr-4 font-medium text-base"
+                    placeholder="0.00"
+                    value={data.fixedCost ?? 0}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(val) => handleFieldChange('fixedCost', Math.max(0, val))}
+                    isDecimal={true}
+                  />
+                </div>
+                <span className="text-[11px] text-gray-500 leading-tight">
+                  Survey programming, translation, platform hosting, or PM overhead.
+                </span>
+              </div>
             </div>
           </section>
 
@@ -344,15 +406,53 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
           {/* Primary Output Highlight */}
           <div className="bg-[#FDF0EE] border-2 border-dashed border-[#E8442C] rounded-xl p-6 text-center relative overflow-hidden shadow-sm">
             <div className="absolute top-0 left-0 w-full h-1 bg-[#E8442C]"></div>
-            <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#E8442C] mb-2">
-              Required Future CPI
+            <h3 className="text-xs font-extrabold uppercase tracking-widest text-[#E8442C] mb-1">
+              Maximum Allowable Future CPI
             </h3>
-            <div className="text-4xl md:text-5xl font-extrabold text-[#E8442C] tracking-tight">
-              {formatCurrency(results.requiredFutureCpi)}
-            </div>
-            <p className="text-xs font-semibold text-[#2B2B2B] mt-3 leading-relaxed">
-              To maintain {data.targetMargin}% margin on {formatNumber(results.remainingCompletes)} remaining completes.
+            <p className="text-[11px] text-gray-500 font-medium mb-3">
+              Maximum allowable average cost per remaining valid complete to achieve target gross margin
             </p>
+
+            {results.remainingCompletes === 0 ? (
+              <div>
+                <div className="text-4xl md:text-5xl font-extrabold text-[#2B2B2B] tracking-tight">
+                  $0.00
+                </div>
+                <div className="inline-block mt-2 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
+                  Target Completes Collected (100%)
+                </div>
+                {results.calculationDetails?.requiredFutureCpi && (
+                  <ViewCalculation {...results.calculationDetails.requiredFutureCpi} />
+                )}
+              </div>
+            ) : results.remainingBudget < 0 ? (
+              <div>
+                <div className="text-4xl md:text-5xl font-extrabold text-red-600 tracking-tight">
+                  $0.00
+                </div>
+                <div className="inline-block mt-2 bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">
+                  Budget Exhausted ({formatCurrency(Math.abs(results.remainingBudget))} Deficit)
+                </div>
+                <p className="text-xs font-semibold text-red-600 mt-2 leading-relaxed">
+                  Incurred cost exceeds total allowed budget. Zero allowable budget remains for the {formatNumber(results.remainingCompletes)} outstanding completes.
+                </p>
+                {results.calculationDetails?.requiredFutureCpi && (
+                  <ViewCalculation {...results.calculationDetails.requiredFutureCpi} />
+                )}
+              </div>
+            ) : (
+              <div>
+                <div className="text-4xl md:text-5xl font-extrabold text-[#E8442C] tracking-tight">
+                  {formatCurrency(results.requiredFutureCpi)}
+                </div>
+                <p className="text-xs font-semibold text-[#2B2B2B] mt-3 leading-relaxed">
+                  To maintain {data.targetMargin}% margin across {formatNumber(results.remainingCompletes)} remaining completes.
+                </p>
+                {results.calculationDetails?.requiredFutureCpi && (
+                  <ViewCalculation {...results.calculationDetails.requiredFutureCpi} />
+                )}
+              </div>
+            )}
           </div>
 
           {/* FEATURE #1: Dual Feasibility Checks (Financial & Operational) */}
@@ -436,6 +536,9 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
               <div className="text-base font-bold text-[#2B2B2B]">
                 {formatCurrency(results.projectRevenue)}
               </div>
+              {results.calculationDetails?.projectRevenue && (
+                <ViewCalculation {...results.calculationDetails.projectRevenue} />
+              )}
             </div>
 
             <div className="bg-white border border-[#E5E5E5] rounded-xl p-3.5 shadow-sm">
@@ -445,15 +548,24 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
               <div className="text-base font-bold text-[#2B2B2B]">
                 {formatCurrency(results.allowedCost)}
               </div>
+              {results.calculationDetails?.allowedCost && (
+                <ViewCalculation {...results.calculationDetails.allowedCost} />
+              )}
             </div>
 
             <div className="bg-white border border-[#E5E5E5] rounded-xl p-3.5 shadow-sm">
               <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-0.5">
-                Incurred Cost
+                Total Recognized Costs
               </div>
               <div className="text-base font-bold text-[#2B2B2B]">
-                {formatCurrency(results.incurredCost)}
+                {formatCurrency(results.totalRecognizedCosts)}
               </div>
+              <div className="text-[10px] text-gray-400 font-normal">
+                Var: {formatCurrency(results.incurredVariableCost)} | Com: {formatCurrency(results.committedCost)} | Fix: {formatCurrency(results.fixedCost)}
+              </div>
+              {results.calculationDetails?.incurredCost && (
+                <ViewCalculation {...results.calculationDetails.incurredCost} />
+              )}
             </div>
 
             <div className="bg-white border border-[#E5E5E5] rounded-xl p-3.5 shadow-sm">
@@ -467,6 +579,9 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
               >
                 {formatCurrency(results.remainingBudget)}
               </div>
+              {results.calculationDetails?.remainingBudget && (
+                <ViewCalculation {...results.calculationDetails.remainingBudget} />
+              )}
             </div>
 
             {/* FEATURE #3: Breakeven CPI */}
@@ -478,6 +593,9 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
                 {formatCurrency(results.breakevenFutureCpi)}
               </div>
               <div className="text-[10px] text-gray-400 font-normal">Going forward</div>
+              {results.calculationDetails?.breakevenFutureCpi && (
+                <ViewCalculation {...results.calculationDetails.breakevenFutureCpi} />
+              )}
             </div>
 
             {/* FEATURE #3: Blended Margin to Date */}
@@ -497,6 +615,9 @@ export const MarginCalculator: React.FC<MarginCalculatorProps> = ({
                   : 'N/A'}
               </div>
               <div className="text-[10px] text-gray-400 font-normal">Achieved so far</div>
+              {results.blendedMarginToDate !== null && results.calculationDetails?.blendedMarginToDate && (
+                <ViewCalculation {...results.calculationDetails.blendedMarginToDate} />
+              )}
             </div>
           </div>
 

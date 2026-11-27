@@ -7,12 +7,22 @@ export interface CpiPhase {
   cpi: number;
 }
 
+export interface CalculationDetail {
+  formula: string;
+  substitution: string;
+  unrounded?: string | number | null;
+  finalResult: string | number;
+  notes?: string;
+}
+
 export interface MarginData {
   totalCompletes: number;
   clientCpi: number;
   targetMargin: number;
   incidenceRate: number;
   phases: CpiPhase[];
+  committedCost?: number; // Optional: committed but unpaid supplier costs
+  fixedCost?: number; // Optional: fixed project costs (platform, PM, programming)
 }
 
 export interface FeasibilityCheck {
@@ -36,6 +46,10 @@ export interface MarginResults {
   projectRevenue: number;
   allowedCost: number;
   incurredCost: number;
+  incurredVariableCost: number;
+  committedCost: number;
+  fixedCost: number;
+  totalRecognizedCosts: number;
   incurredCompletes: number;
   remainingBudget: number;
   remainingCompletes: number;
@@ -47,6 +61,9 @@ export interface MarginResults {
   smartRecommendations: SmartRecommendation[];
   assertionPassed: boolean; // Project Revenue / Total Completes == Client CPI
   validationErrors: Record<string, string>;
+  isBudgetExhausted?: boolean;
+  budgetDeficit?: number;
+  calculationDetails?: Record<string, CalculationDetail>;
 }
 
 export type ProgressTrackBy = 'entrants' | 'completes';
@@ -56,24 +73,51 @@ export interface InvitationData {
   bidIr: number;
   infieldIr: number;
   panelResponseRate: number;
+  validCompletionRate?: number; // percentage (0.1 - 100), defaults to 100
   completesAchieved: number;
+  outstandingInvitations?: number; // invitations currently in field awaiting response
+  invitationsAlreadySent?: number; // total invitations already sent to date (optional)
+  invitationBuffer?: number; // optional buffer percentage (0 - 50), default 0
   trackProgressBy?: ProgressTrackBy;
   totalEntrantsSoFar?: number | string | null;
   completesSoFar?: number | string | null;
 }
 
 export interface InvitationResults {
+  // Stage 1: Bid Estimate (Reference based on bid IR and 100% target)
   bidParticipants: number;
+  bidParticipantsExact: number;
   bidInvites: number;
+
+  // Stage 2: Live Performance Estimate (Additional invites for remaining target)
   liveParticipants: number;
-  liveInvites: number;
+  liveParticipantsExact: number;
+  liveParticipantsRemaining: number;
+  additionalParticipantsNeeded: number;
+  additionalParticipantsNeededExact: number;
+  remainingCompletes: number;
+  expectedPendingCompletes: number;
+  remainingCompletesAfterPending: number;
+  expectedValidCompletesPerInvite: number;
+  baselineAdditionalInvites: number;
+  bufferedAdditionalInvites: number;
+  liveInvites: number; // Represents estimated additional invitations needed (buffered if buffer > 0)
+  totalProjectedInvites: number | null; // invitationsAlreadySent + liveInvites if sent provided
+  isEstimateUnavailable: boolean;
+  unavailableReason?: string;
+
+  // Stage 3 & Legacy Compatibility
   remainingCompletesNeeded: number;
   estimatedInvitesSent: number | null;
   progressPercentage: number;
   progressInvitationsSent: number | null;
+  progressInvitationsEstimated: number | null;
+  progressInvitationsRecorded: number | null;
+  progressIsActual: boolean;
   progressFormulaNote: string;
   assertionPassed: boolean;
   validationErrors: Record<string, string>;
+  calculationDetails?: Record<string, CalculationDetail>;
 }
 
 export interface NotificationItem {
